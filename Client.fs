@@ -4,35 +4,63 @@ open WebSharper
 open WebSharper.JavaScript
 open WebSharper.UI
 open WebSharper.UI.Client
-open WebSharper.UI.Templating
+open WebSharper.UI.Html
 
 [<JavaScript>]
 module Client =
-    // The templates are loaded from the DOM, so you just can edit index.html
-    // and refresh your browser, no need to recompile unless you add or remove holes.
-    type IndexTemplate = Template<"wwwroot/index.html", ClientLoad.FromDocument>
 
-    let People =
-        ListModel.FromSeq [
-            "John"
-            "Paul"
-        ]
+    let battery = Var.Create ""
+    let consumption = Var.Create ""
+    let distance = Var.Create ""
+    let price = Var.Create ""
 
+    let result = Var.Create ""
+
+    let calculate () =
+        try
+            let b = float battery.Value
+            let c = float consumption.Value
+            let d = float distance.Value
+            let p = float price.Value
+
+            let energyNeeded = (d / 100.0) * c
+            let cost = energyNeeded * p
+
+            result.Value <-
+                "Energy needed: " + string energyNeeded + " kWh | Estimated cost: " + string cost + " €"
+        with
+            _ -> result.Value <- "Invalid input"
 
     [<SPAEntryPoint>]
     let Main () =
-        let newName = Var.Create ""
 
-        IndexTemplate.Main()
-            .ListContainer(
-                People.View.DocSeqCached(fun (name: string) ->
-                    IndexTemplate.ListItem().Name(name).Doc()
-                )
-            )
-            .Name(newName)
-            .Add(fun _ ->
-                People.Add(newName.Value)
-                newName.Value <- ""
-            )
-            .Doc()
+        div [] [
+
+            h1 [] [text "VoltRoute – EV Trip Planner"]
+
+            p [] [text "Battery capacity (kWh)"]
+            Doc.Input [] battery
+
+            p [] [text "Consumption (kWh / 100km)"]
+            Doc.Input [] consumption
+
+            p [] [text "Trip distance (km)"]
+            Doc.Input [] distance
+
+            p [] [text "Electricity price (€/kWh)"]
+            Doc.Input [] price
+
+            br [] []
+            br [] []
+
+            button [on.click (fun _ _ -> calculate())] [text "Calculate"]
+
+            br [] []
+            br [] []
+
+            div [] [
+                textView result.View
+            ]
+
+        ]
         |> Doc.RunById "main"
