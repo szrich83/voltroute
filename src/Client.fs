@@ -20,6 +20,7 @@ module Client =
     let price = Var.Create "0.25"
     let soc = Var.Create "80"
     let chargingPower = Var.Create "50"
+    let targetSoc = Var.Create "80"
 
     let availableEnergyText = Var.Create "-"
     let availableRangeText = Var.Create "-"
@@ -54,6 +55,7 @@ module Client =
                     ElectricityPrice = float price.Value
                     StateOfChargePercent = float soc.Value
                     ChargingPowerKw = float chargingPower.Value
+                    TargetSocPercent = float targetSoc.Value
                 }
 
             let result = calculateTrip input
@@ -106,6 +108,30 @@ module Client =
                         text v
                     ]
                 ) valueView
+            ]
+        ]
+
+    let chargingStopsHighlight valueView =
+        div [ attr.``class`` "highlight-box" ] [
+            div [ attr.``class`` "highlight-left" ] [
+                span [ attr.``class`` "highlight-icon" ] [ text "⚡" ]
+                span [ attr.``class`` "highlight-label" ] [ text "Estimated charging stops" ]
+            ]
+
+            span [ attr.``class`` "highlight-value" ] [
+                textView valueView
+            ]
+        ]
+
+    let chargingTimeHighlight valueView =
+        div [ attr.``class`` "highlight-box highlight-time" ] [
+            div [ attr.``class`` "highlight-left" ] [
+                span [ attr.``class`` "highlight-icon" ] [ text "⏱" ]
+                span [ attr.``class`` "highlight-label" ] [ text "Estimated charging time" ]
+            ]
+
+            span [ attr.``class`` "highlight-value" ] [
+                textView valueView
             ]
         ]
 
@@ -178,7 +204,7 @@ module Client =
                 h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
 
                 p [ attr.``class`` "subtitle" ] [
-                    text "Estimate EV energy use, range, charging stops, and trip cost."
+                    text "Estimate EV energy use, range, charging strategy, charging stops, and trip cost."
                 ]
 
                 div [ attr.``class`` "grid" ] [
@@ -190,6 +216,7 @@ module Client =
                     field "Electricity price (€/kWh)" price
                     field "State of charge (%)" soc
                     field "Charging power (kW)" chargingPower
+                    field "Target charge (%)" targetSoc
                 ]
 
                 div [ attr.``class`` "button-row" ] [
@@ -209,14 +236,17 @@ module Client =
             div [ attr.``class`` "card results-card" ] [
                 h2 [ attr.``class`` "results-title" ] [ text "Results" ]
 
+                div [ attr.``class`` "highlight-stack" ] [
+                    chargingStopsHighlight chargingStopsText.View
+                    chargingTimeHighlight chargingTimeText.View
+                ]
+
                 resultRow "Available energy" availableEnergyText.View
                 resultRow "Available range" availableRangeText.View
                 resultRow "Energy needed" energyNeededText.View
                 resultRow "Trip cost" tripCostText.View
                 statusRow "Needs charging" needsChargingText.View
                 resultRow "Charging needed" chargingNeededText.View
-                resultRow "Charging stops" chargingStopsText.View
-                resultRow "Charging time" chargingTimeText.View
                 resultRow "Remaining energy" remainingEnergyText.View
                 resultRow "Remaining SOC" remainingSocText.View
             ]

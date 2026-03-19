@@ -13,6 +13,7 @@ module Calculations =
             ElectricityPrice : float
             StateOfChargePercent : float
             ChargingPowerKw : float
+            TargetSocPercent : float
         }
 
     type TripResult =
@@ -68,12 +69,11 @@ module Calculations =
                 if currentSoc >= toSoc then
                     acc
                 else
-                    let nextSoc =
-                        min toSoc (currentSoc + step)
-
+                    let nextSoc = min toSoc (currentSoc + step)
                     let socDelta = nextSoc - currentSoc
                     let energyToAdd = batteryCapacity * (socDelta / 100.0)
                     let effectivePower = chargingPowerKw * chargingPowerFactor currentSoc
+
                     let hours =
                         if effectivePower <= 0.0 then 0.0
                         else energyToAdd / effectivePower
@@ -89,7 +89,14 @@ module Calculations =
             let remainingAfterStart = distanceKm - startRangeKm
             int (ceil (remainingAfterStart / perStopRangeKm))
 
+    let normalizeTargetSoc targetSoc =
+        targetSoc
+        |> max 20.0
+        |> min 95.0
+
     let calculateTrip (input: TripInput) =
+        let effectiveTargetSoc = normalizeTargetSoc input.TargetSocPercent
+
         let availableEnergy =
             calculateAvailableEnergy input.BatteryCapacity input.StateOfChargePercent
 
@@ -112,7 +119,7 @@ module Calculations =
             calculateRemainingSoc remainingEnergy input.BatteryCapacity
 
         let fullUsableEnergyPerStop =
-            input.BatteryCapacity * ((80.0 - 10.0) / 100.0)
+            input.BatteryCapacity * ((effectiveTargetSoc - 10.0) / 100.0)
 
         let perStopRangeKm =
             calculateAvailableRange fullUsableEnergyPerStop input.ConsumptionPer100Km
@@ -124,11 +131,12 @@ module Calculations =
             if energyNeeded <= availableEnergy then
                 0.0
             else
-                let firstLegSocArrival =
-                    10.0
-
                 let perStopChargeTime =
-                    estimateChargingTimeSegment input.BatteryCapacity input.ChargingPowerKw firstLegSocArrival 80.0
+                    estimateChargingTimeSegment
+                        input.BatteryCapacity
+                        input.ChargingPowerKw
+                        10.0
+                        effectiveTargetSoc
 
                 float chargingStops * perStopChargeTime
 

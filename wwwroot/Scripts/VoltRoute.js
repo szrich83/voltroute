@@ -6,14 +6,14 @@ function isIDisposable(x){
 }
 function Main(){
   calculate();
-  const _1=Doc.Element("div", [Attr.Create("class", "page")], [Doc.Element("div", [Attr.Create("class", "card")], [Doc.Element("h1", [Attr.Create("class", "title")], [Doc.TextNode("VoltRoute \u2013 EV Trip Planner")]), Doc.Element("p", [Attr.Create("class", "subtitle")], [Doc.TextNode("Estimate EV energy use, range, charging stops, and trip cost.")]), Doc.Element("div", [Attr.Create("class", "grid")], [brandField(), modelField(), field("Battery capacity (kWh)", battery()), field("Consumption (kWh / 100 km)", consumption()), field("Trip distance (km)", distance()), field("Electricity price (\u20ac/kWh)", price()), field("State of charge (%)", soc()), field("Charging power (kW)", chargingPower())]), Doc.Element("div", [Attr.Create("class", "button-row")], [Doc.Element("button", [Attr.Create("class", "calculate-button"), Attr.HandlerImpl("click", () =>() => calculate())], [Doc.TextNode("Calculate")])]), Doc.Element("div", [Attr.Create("class", "error-text")], [Doc.TextView(errorText().View)])]), Doc.Element("div", [Attr.Create("class", "card results-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("Results")]), resultRow("Available energy", availableEnergyText().View), resultRow("Available range", availableRangeText().View), resultRow("Energy needed", energyNeededText().View), resultRow("Trip cost", tripCostText().View), statusRow("Needs charging", needsChargingText().View), resultRow("Charging needed", chargingNeededText().View), resultRow("Charging stops", chargingStopsText().View), resultRow("Charging time", chargingTimeText().View), resultRow("Remaining energy", remainingEnergyText().View), resultRow("Remaining SOC", remainingSocText().View)])]);
+  const _1=Doc.Element("div", [Attr.Create("class", "page")], [Doc.Element("div", [Attr.Create("class", "card")], [Doc.Element("h1", [Attr.Create("class", "title")], [Doc.TextNode("VoltRoute \u2013 EV Trip Planner")]), Doc.Element("p", [Attr.Create("class", "subtitle")], [Doc.TextNode("Estimate EV energy use, range, charging strategy, charging stops, and trip cost.")]), Doc.Element("div", [Attr.Create("class", "grid")], [brandField(), modelField(), field("Battery capacity (kWh)", battery()), field("Consumption (kWh / 100 km)", consumption()), field("Trip distance (km)", distance()), field("Electricity price (\u20ac/kWh)", price()), field("State of charge (%)", soc()), field("Charging power (kW)", chargingPower()), field("Target charge (%)", targetSoc())]), Doc.Element("div", [Attr.Create("class", "button-row")], [Doc.Element("button", [Attr.Create("class", "calculate-button"), Attr.HandlerImpl("click", () =>() => calculate())], [Doc.TextNode("Calculate")])]), Doc.Element("div", [Attr.Create("class", "error-text")], [Doc.TextView(errorText().View)])]), Doc.Element("div", [Attr.Create("class", "card results-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("Results")]), Doc.Element("div", [Attr.Create("class", "highlight-stack")], [chargingStopsHighlight(chargingStopsText().View), chargingTimeHighlight(chargingTimeText().View)]), resultRow("Available energy", availableEnergyText().View), resultRow("Available range", availableRangeText().View), resultRow("Energy needed", energyNeededText().View), resultRow("Trip cost", tripCostText().View), statusRow("Needs charging", needsChargingText().View), resultRow("Charging needed", chargingNeededText().View), resultRow("Remaining energy", remainingEnergyText().View), resultRow("Remaining SOC", remainingSocText().View)])]);
   LoadLocalTemplates("");
   Doc.RunById("main", _1);
 }
 function calculate(){
   try {
     errorText().Set("");
-    const result=calculateTrip(New_1(Number(battery().Get()), Number(consumption().Get()), Number(distance().Get()), Number(price().Get()), Number(soc().Get()), Number(chargingPower().Get())));
+    const result=calculateTrip(New_1(Number(battery().Get()), Number(consumption().Get()), Number(distance().Get()), Number(price().Get()), Number(soc().Get()), Number(chargingPower().Get()), Number(targetSoc().Get())));
     availableEnergyText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" kWh"))((x) => x))(result.AvailableEnergyKWh));
     availableRangeText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" km"))((x) => x))(result.AvailableRangeKm));
     energyNeededText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" kWh"))((x) => x))(result.EnergyNeededKWh));
@@ -72,8 +72,23 @@ function soc(){
 function chargingPower(){
   return _c.chargingPower;
 }
+function targetSoc(){
+  return _c.targetSoc;
+}
 function errorText(){
   return _c.errorText;
+}
+function chargingStopsHighlight(valueView){
+  return Doc.Element("div", [Attr.Create("class", "highlight-box")], [Doc.Element("div", [Attr.Create("class", "highlight-left")], [Doc.Element("span", [Attr.Create("class", "highlight-icon")], [Doc.TextNode("\u26a1")]), Doc.Element("span", [Attr.Create("class", "highlight-label")], [Doc.TextNode("Estimated charging stops")])]), Doc.Element("span", [Attr.Create("class", "highlight-value")], [Doc.TextView(valueView)])]);
+}
+function chargingStopsText(){
+  return _c.chargingStopsText;
+}
+function chargingTimeHighlight(valueView){
+  return Doc.Element("div", [Attr.Create("class", "highlight-box highlight-time")], [Doc.Element("div", [Attr.Create("class", "highlight-left")], [Doc.Element("span", [Attr.Create("class", "highlight-icon")], [Doc.TextNode("\u23f1")]), Doc.Element("span", [Attr.Create("class", "highlight-label")], [Doc.TextNode("Estimated charging time")])]), Doc.Element("span", [Attr.Create("class", "highlight-value")], [Doc.TextView(valueView)])]);
+}
+function chargingTimeText(){
+  return _c.chargingTimeText;
 }
 function resultRow(labelText, valueView){
   return Doc.Element("div", [Attr.Create("class", "result-row")], [Doc.Element("span", [Attr.Create("class", "result-label")], [Doc.TextNode(labelText)]), Doc.Element("span", [Attr.Create("class", "result-value")], [Doc.TextView(valueView)])]);
@@ -98,12 +113,6 @@ function needsChargingText(){
 }
 function chargingNeededText(){
   return _c.chargingNeededText;
-}
-function chargingStopsText(){
-  return _c.chargingStopsText;
-}
-function chargingTimeText(){
-  return _c.chargingTimeText;
 }
 function remainingEnergyText(){
   return _c.remainingEnergyText;
@@ -155,6 +164,7 @@ class Object_1 {
 class attr extends Object_1 { }
 class Var extends Object_1 { }
 function calculateTrip(input){
+  const effectiveTargetSoc=normalizeTargetSoc(input.TargetSocPercent);
   const availableEnergy=calculateAvailableEnergy(input.BatteryCapacity, input.StateOfChargePercent);
   const availableRange=calculateAvailableRange(availableEnergy, input.ConsumptionPer100Km);
   const energyNeeded=calculateEnergyNeeded(input.DistanceKm, input.ConsumptionPer100Km);
@@ -162,8 +172,14 @@ function calculateTrip(input){
   const chargingNeeded=calculateChargingNeeded(energyNeeded, availableEnergy);
   const remainingEnergy=calculateRemainingEnergy(availableEnergy, energyNeeded);
   const remainingSoc=calculateRemainingSoc(remainingEnergy, input.BatteryCapacity);
-  const chargingStops=estimateChargingStops(input.DistanceKm, availableRange, calculateAvailableRange(input.BatteryCapacity*((80-10)/100), input.ConsumptionPer100Km));
-  return New(availableEnergy, availableRange, energyNeeded, tripCost, energyNeeded>availableEnergy, chargingNeeded, energyNeeded<=availableEnergy?0:chargingStops*estimateChargingTimeSegment(input.BatteryCapacity, input.ChargingPowerKw, 10, 80), remainingEnergy, remainingSoc, chargingStops);
+  const chargingStops=estimateChargingStops(input.DistanceKm, availableRange, calculateAvailableRange(input.BatteryCapacity*((effectiveTargetSoc-10)/100), input.ConsumptionPer100Km));
+  return New(availableEnergy, availableRange, energyNeeded, tripCost, energyNeeded>availableEnergy, chargingNeeded, energyNeeded<=availableEnergy?0:chargingStops*estimateChargingTimeSegment(input.BatteryCapacity, input.ChargingPowerKw, 10, effectiveTargetSoc), remainingEnergy, remainingSoc, chargingStops);
+}
+function normalizeTargetSoc(targetSoc_1){
+  const a=20;
+  const e=Compare(a, targetSoc_1)===1?a:targetSoc_1;
+  const a_1=95;
+  return Compare(a_1, e)===-1?a_1:e;
 }
 function calculateAvailableEnergy(batteryCapacity, socPercent){
   return batteryCapacity*(socPercent/100);
@@ -230,14 +246,15 @@ function New(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, Ne
     ChargingStops:ChargingStops
   };
 }
-function New_1(BatteryCapacity, ConsumptionPer100Km, DistanceKm, ElectricityPrice, StateOfChargePercent, ChargingPowerKw){
+function New_1(BatteryCapacity, ConsumptionPer100Km, DistanceKm, ElectricityPrice, StateOfChargePercent, ChargingPowerKw, TargetSocPercent){
   return{
     BatteryCapacity:BatteryCapacity, 
     ConsumptionPer100Km:ConsumptionPer100Km, 
     DistanceKm:DistanceKm, 
     ElectricityPrice:ElectricityPrice, 
     StateOfChargePercent:StateOfChargePercent, 
-    ChargingPowerKw:ChargingPowerKw
+    ChargingPowerKw:ChargingPowerKw, 
+    TargetSocPercent:TargetSocPercent
   };
 }
 class Attr {
@@ -778,6 +795,7 @@ let _c=Lazy((_i) => class $StartupCode_Client {
   static energyNeededText;
   static availableRangeText;
   static availableEnergyText;
+  static targetSoc;
   static chargingPower;
   static soc;
   static price;
@@ -795,6 +813,7 @@ let _c=Lazy((_i) => class $StartupCode_Client {
     this.price=_c_2.Create_1("0.25");
     this.soc=_c_2.Create_1("80");
     this.chargingPower=_c_2.Create_1("50");
+    this.targetSoc=_c_2.Create_1("80");
     this.availableEnergyText=_c_2.Create_1("-");
     this.availableRangeText=_c_2.Create_1("-");
     this.energyNeededText=_c_2.Create_1("-");
