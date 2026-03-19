@@ -7,20 +7,22 @@ body {
 }
 
 .page {
-    max-width: 900px;
-    margin: 40px auto;
-    padding: 0 16px 40px 16px;
+    min-height: 100vh;
+    background: #030f1f;
+    padding: 40px 20px;
 }
 
 .card {
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    background: #0b1a2b;
+    border-radius: 18px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    color: #e2e8f0;
     margin-bottom: 24px;
 }
 
 .title {
+    color: #f1f5f9;
     margin: 0 0 8px 0;
     font-size: 2rem;
     line-height: 1.2;
@@ -28,8 +30,26 @@ body {
 
 .subtitle {
     margin: 0 0 24px 0;
-    color: #4b5563;
+    color: #94a3b8;
     font-size: 1rem;
+}
+
+.hero {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.hero .title {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.hero .subtitle {
+    font-size: 1.2rem;
+    color: #94a3b8;
+    max-width: 700px;
+    margin: 0 auto;
 }
 
 .grid {
@@ -52,16 +72,16 @@ body {
 .input {
     padding: 12px 14px;
     font-size: 1rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid #1e293b;
     border-radius: 10px;
+    color: #e2e8f0;
     outline: none;
-    background: #fff;
+    background: #020617;
     box-sizing: border-box;
 }
 
-.input:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+.input::placeholder {
+    color: #64748b;
 }
 
 .button-row {
@@ -69,18 +89,18 @@ body {
 }
 
 .calculate-button {
-    background: #2563eb;
+    background: linear-gradient(135deg, #2563eb, #06b6d4);
     color: white;
     border: none;
     border-radius: 10px;
-    padding: 12px 18px;
+    padding: 12px 20px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
 }
 
 .calculate-button:hover {
-    background: #1d4ed8;
+    opacity: 0.9;
 }
 
 .error-text {
@@ -109,12 +129,12 @@ body {
 }
 
 .result-label {
-    color: #374151;
+    color: #94a3b8;
     font-weight: 600;
 }
 
 .result-value {
-    color: #111827;
+    color: #f1f5f9;
     font-weight: 700;
     text-align: right;
 }
@@ -149,8 +169,8 @@ body {
     padding: 16px 18px;
     border-radius: 14px;
     margin-bottom: 18px;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
+    background: #020617;
+    border: 1px solid #1e293b;
 }
 
 .highlight-left {
@@ -166,13 +186,13 @@ body {
 
 .highlight-label {
     font-weight: 700;
-    color: #1e3a8a;
+    color: #38bdf8;
 }
 
 .highlight-value {
     font-weight: 800;
     font-size: 1.2rem;
-    color: #1d4ed8;
+    color: #7dd3fc;
 }
 
 .highlight-muted {
@@ -196,16 +216,16 @@ body {
 }
 
 .highlight-time {
-    background: #ecfeff;
-    border: 1px solid #a5f3fc;
+    background: #021a1a;
+    border: 1px solid #134e4a;
 }
 
 .highlight-time .highlight-label {
-    color: #155e75;
+    color: #2dd4bf;
 }
 
 .highlight-time .highlight-value {
-    color: #0f766e;
+    color: #5eead4;
 }
 
 @media (max-width: 700px) {

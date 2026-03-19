@@ -201,10 +201,12 @@ module Client =
         div [ attr.``class`` "page" ] [
 
             div [ attr.``class`` "card" ] [
-                h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
+                div [ attr.``class`` "hero" ] [
+                    h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
 
-                p [ attr.``class`` "subtitle" ] [
+                    p [ attr.``class`` "subtitle" ] [
                     text "Estimate EV energy use, range, charging strategy, charging stops, and trip cost."
+                    ]
                 ]
 
                 div [ attr.``class`` "grid" ] [
