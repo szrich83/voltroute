@@ -119,6 +119,10 @@ body {
     text-align: right;
 }
 
+.field-full {
+    grid-column: 1 / -1;
+}
+
 @media (max-width: 700px) {
     .grid {
         grid-template-columns: 1fr;

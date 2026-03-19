@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="src/Calculations.fs" />
     <Compile Include="src/TripAnalysis.fs" />
+    <Compile Include="src/VehiclePresets.fs" />
     <Compile Include="src/Client.fs" />
     <Compile Include="src/Startup.fs" />
     <None Include="package.json" />

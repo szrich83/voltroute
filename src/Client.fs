@@ -6,9 +6,13 @@ open WebSharper.UI
 open WebSharper.UI.Client
 open WebSharper.UI.Html
 open VoltRoute.Calculations
+open VoltRoute.VehiclePresets
 
 [<JavaScript>]
 module Client =
+
+    let selectedBrand = Var.Create ""
+    let selectedModelId = Var.Create ""
 
     let battery = Var.Create "75"
     let consumption = Var.Create "18"
@@ -28,8 +32,14 @@ module Client =
     let remainingSocText = Var.Create "-"
     let errorText = Var.Create ""
 
-    let format2 (value: float) =
-        sprintf "%.2f" value
+    let applyPreset presetId =
+        match tryFindPresetById presetId with
+        | Some preset ->
+            battery.Value <- string preset.BatteryCapacity
+            consumption.Value <- string preset.ConsumptionPer100Km
+            chargingPower.Value <- string preset.ChargingPowerKw
+        | None ->
+            ()
 
     let calculate () =
         try
@@ -72,6 +82,66 @@ module Client =
             span [ attr.``class`` "result-value" ] [ textView valueView ]
         ]
 
+    let brandField () =
+        div [ attr.``class`` "field" ] [
+            label [ attr.``class`` "label" ] [ text "Brand" ]
+
+            select [
+                attr.``class`` "input"
+                on.change (fun el _ ->
+                    let value = string el?value
+                    selectedBrand.Value <- value
+                    selectedModelId.Value <- ""
+                )
+            ] [
+                option [ attr.value "" ] [ text "Select brand" ]
+
+                yield!
+                    brands
+                    |> List.map (fun brand ->
+                        option [ attr.value brand ] [ text brand ]
+                    )
+            ]
+        ]
+
+    let modelField () =
+        let modelOptionsDoc =
+            selectedBrand.View
+            |> View.Map (fun brand ->
+                let baseOptions =
+                    [ option [ attr.value "" ] [ text "Select model" ] ]
+
+                let options =
+                    if brand = "" then
+                        baseOptions
+                    else
+                        baseOptions @
+                        (
+                            modelsForBrand brand
+                            |> List.map (fun preset ->
+                                option [ attr.value preset.Id ] [ text preset.Model ]
+                            )
+                        )
+
+                Doc.Concat options
+            )
+
+        div [ attr.``class`` "field" ] [
+            label [ attr.``class`` "label" ] [ text "Model" ]
+
+            select [
+                attr.``class`` "input"
+                on.change (fun el _ ->
+                    let value = string el?value
+                    selectedModelId.Value <- value
+                    applyPreset value
+                    calculate ()
+                )
+            ] [
+                Doc.BindView id modelOptionsDoc
+            ]
+        ]
+
     [<SPAEntryPoint>]
     let Main () =
         calculate ()
@@ -86,6 +156,8 @@ module Client =
                 ]
 
                 div [ attr.``class`` "grid" ] [
+                    brandField ()
+                    modelField ()
                     field "Battery capacity (kWh)" battery
                     field "Consumption (kWh / 100 km)" consumption
                     field "Trip distance (km)" distance
