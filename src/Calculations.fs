@@ -26,6 +26,7 @@ module Calculations =
             ChargingTimeHours : float
             RemainingEnergyKWh : float
             RemainingSocPercent : float
+            ChargingStops : int
         }
 
     let calculateAvailableEnergy batteryCapacity socPercent =
@@ -44,16 +45,49 @@ module Calculations =
     let calculateChargingNeeded energyNeeded availableEnergy =
         max 0.0 (energyNeeded - availableEnergy)
 
-    let calculateChargingTime chargingNeeded chargingPowerKw =
-        if chargingPowerKw <= 0.0 then 0.0
-        else chargingNeeded / chargingPowerKw
-
     let calculateRemainingEnergy availableEnergy energyNeeded =
         max 0.0 (availableEnergy - energyNeeded)
 
     let calculateRemainingSoc remainingEnergy batteryCapacity =
         if batteryCapacity <= 0.0 then 0.0
         else (remainingEnergy / batteryCapacity) * 100.0
+
+    let chargingPowerFactor soc =
+        if soc < 20.0 then 0.85
+        elif soc < 60.0 then 1.0
+        elif soc < 80.0 then 0.65
+        else 0.30
+
+    let estimateChargingTimeSegment batteryCapacity chargingPowerKw fromSoc toSoc =
+        if batteryCapacity <= 0.0 || chargingPowerKw <= 0.0 || toSoc <= fromSoc then
+            0.0
+        else
+            let step = 5.0
+
+            let rec loop currentSoc acc =
+                if currentSoc >= toSoc then
+                    acc
+                else
+                    let nextSoc =
+                        min toSoc (currentSoc + step)
+
+                    let socDelta = nextSoc - currentSoc
+                    let energyToAdd = batteryCapacity * (socDelta / 100.0)
+                    let effectivePower = chargingPowerKw * chargingPowerFactor currentSoc
+                    let hours =
+                        if effectivePower <= 0.0 then 0.0
+                        else energyToAdd / effectivePower
+
+                    loop nextSoc (acc + hours)
+
+            loop fromSoc 0.0
+
+    let estimateChargingStops distanceKm startRangeKm perStopRangeKm =
+        if distanceKm <= startRangeKm then
+            0
+        else
+            let remainingAfterStart = distanceKm - startRangeKm
+            int (ceil (remainingAfterStart / perStopRangeKm))
 
     let calculateTrip (input: TripInput) =
         let availableEnergy =
@@ -71,14 +105,32 @@ module Calculations =
         let chargingNeeded =
             calculateChargingNeeded energyNeeded availableEnergy
 
-        let chargingTime =
-            calculateChargingTime chargingNeeded input.ChargingPowerKw
-
         let remainingEnergy =
             calculateRemainingEnergy availableEnergy energyNeeded
 
         let remainingSoc =
             calculateRemainingSoc remainingEnergy input.BatteryCapacity
+
+        let fullUsableEnergyPerStop =
+            input.BatteryCapacity * ((80.0 - 10.0) / 100.0)
+
+        let perStopRangeKm =
+            calculateAvailableRange fullUsableEnergyPerStop input.ConsumptionPer100Km
+
+        let chargingStops =
+            estimateChargingStops input.DistanceKm availableRange perStopRangeKm
+
+        let chargingTime =
+            if energyNeeded <= availableEnergy then
+                0.0
+            else
+                let firstLegSocArrival =
+                    10.0
+
+                let perStopChargeTime =
+                    estimateChargingTimeSegment input.BatteryCapacity input.ChargingPowerKw firstLegSocArrival 80.0
+
+                float chargingStops * perStopChargeTime
 
         {
             AvailableEnergyKWh = availableEnergy
@@ -90,4 +142,5 @@ module Calculations =
             ChargingTimeHours = chargingTime
             RemainingEnergyKWh = remainingEnergy
             RemainingSocPercent = remainingSoc
+            ChargingStops = chargingStops
         }

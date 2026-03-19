@@ -30,6 +30,7 @@ module Client =
     let chargingTimeText = Var.Create "-"
     let remainingEnergyText = Var.Create "-"
     let remainingSocText = Var.Create "-"
+    let chargingStopsText = Var.Create "-"
     let errorText = Var.Create ""
 
     let applyPreset presetId =
@@ -64,8 +65,14 @@ module Client =
             needsChargingText.Value <- if result.NeedsCharging then "Yes" else "No"
             chargingNeededText.Value <- sprintf "%.2f kWh" result.ChargingNeededKWh
             chargingTimeText.Value <- sprintf "%.2f h" result.ChargingTimeHours
-            remainingEnergyText.Value <- sprintf "%.2f kWh" result.RemainingEnergyKWh
-            remainingSocText.Value <- sprintf "%.2f %%" result.RemainingSocPercent
+            chargingStopsText.Value <- string result.ChargingStops
+
+            if result.NeedsCharging then
+                remainingEnergyText.Value <- "N/A"
+                remainingSocText.Value <- "N/A"
+            else
+                remainingEnergyText.Value <- sprintf "%.2f kWh" result.RemainingEnergyKWh
+                remainingSocText.Value <- sprintf "%.2f %%" result.RemainingSocPercent
         with
         | _ ->
             errorText.Value <- "Invalid input. Please enter valid numeric values."
@@ -82,6 +89,26 @@ module Client =
             span [ attr.``class`` "result-value" ] [ textView valueView ]
         ]
 
+    let statusRow labelText valueView =
+        div [ attr.``class`` "result-row" ] [
+            span [ attr.``class`` "result-label" ] [ text labelText ]
+
+            span [ attr.``class`` "result-value" ] [
+                Doc.BindView (fun v ->
+                    let isYes = (v = "Yes")
+
+                    span [
+                        attr.``class`` (
+                            "status-badge " +
+                            (if isYes then "status-yes" else "status-no")
+                        )
+                    ] [
+                        text v
+                    ]
+                ) valueView
+            ]
+        ]
+
     let brandField () =
         div [ attr.``class`` "field" ] [
             label [ attr.``class`` "label" ] [ text "Brand" ]
@@ -95,7 +122,6 @@ module Client =
                 )
             ] [
                 option [ attr.value "" ] [ text "Select brand" ]
-
                 yield!
                     brands
                     |> List.map (fun brand ->
@@ -152,7 +178,7 @@ module Client =
                 h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
 
                 p [ attr.``class`` "subtitle" ] [
-                    text "Estimate EV energy use, range, charging need, and trip cost."
+                    text "Estimate EV energy use, range, charging stops, and trip cost."
                 ]
 
                 div [ attr.``class`` "grid" ] [
@@ -187,8 +213,9 @@ module Client =
                 resultRow "Available range" availableRangeText.View
                 resultRow "Energy needed" energyNeededText.View
                 resultRow "Trip cost" tripCostText.View
-                resultRow "Needs charging" needsChargingText.View
+                statusRow "Needs charging" needsChargingText.View
                 resultRow "Charging needed" chargingNeededText.View
+                resultRow "Charging stops" chargingStopsText.View
                 resultRow "Charging time" chargingTimeText.View
                 resultRow "Remaining energy" remainingEnergyText.View
                 resultRow "Remaining SOC" remainingSocText.View
