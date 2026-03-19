@@ -2,14 +2,14 @@
 
 # VoltRoute – EV Trip Planner
 
-![.NET](https://img.shields.io/badge/.NET-8.0-blue)
+![.NET](https://img.shields.io/badge/.NET-10.0-blue)
 ![F#](https://img.shields.io/badge/language-F%23-blueviolet)
 ![WebSharper](https://img.shields.io/badge/WebSharper-UI-orange)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![GitHub repo size](https://img.shields.io/github/repo-size/szrich83/VoltRoute)
 ![GitHub last commit](https://img.shields.io/github/last-commit/szrich83/VoltRoute)
 
-```markdown
+
 ![VoltRoute Preview](docs/main.png)
 
 Modern EV trip planning tool that estimates **range, charging stops, charging time, and trip cost** based on realistic electric vehicle behavior.
