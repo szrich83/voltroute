@@ -34,6 +34,7 @@ module Client =
     let remainingSocText = Var.Create "-"
     let chargingStopsText = Var.Create "-"
     let errorText = Var.Create ""
+    let chargingStopDetails = Var.Create<List<ChargingStop>>([])
 
     let applyPreset presetId =
         match tryFindPresetById presetId with
@@ -69,6 +70,7 @@ module Client =
             chargingNeededText.Value <- sprintf "%.2f kWh" result.ChargingNeededKWh
             chargingTimeText.Value <- sprintf "%.2f h" result.ChargingTimeHours
             chargingStopsText.Value <- string result.ChargingStops
+            chargingStopDetails.Value <- result.ChargingStopDetails
 
             if result.NeedsCharging then
                 remainingEnergyText.Value <- "N/A"
@@ -79,6 +81,7 @@ module Client =
         with
         | _ ->
             errorText.Value <- "Invalid input. Please enter valid numeric values."
+            chargingStopDetails.Value <- []
 
     let field labelText valueVar =
         div [ attr.``class`` "field" ] [
@@ -136,49 +139,59 @@ module Client =
             ]
         ]
 
-    let timelineNode className iconText labelText =
-        div [ attr.``class`` ("timeline-node " + className) ] [
-            div [ attr.``class`` "timeline-icon" ] [ text iconText ]
-            div [ attr.``class`` "timeline-label" ] [ text labelText ]
-        ]
-
     let timelineSeparator =
         div [ attr.``class`` "timeline-separator" ] []
 
-    let chargingTimeline stopsView =
+    let startNode =
+        div [ attr.``class`` "timeline-node timeline-start" ] [
+            div [ attr.``class`` "timeline-icon" ] [ text "●" ]
+            div [ attr.``class`` "timeline-label" ] [ text "Start" ]
+        ]
+
+    let endNode =
+        div [ attr.``class`` "timeline-node timeline-end" ] [
+            div [ attr.``class`` "timeline-icon" ] [ text "🏁" ]
+            div [ attr.``class`` "timeline-label" ] [ text "End" ]
+        ]
+
+    let chargeNode (stop: ChargingStop) =
+        let minutes = int (Math.Round(stop.ChargeTimeHours * 60.0))
+
+        div [ attr.``class`` "timeline-node timeline-charge" ] [
+            div [ attr.``class`` "timeline-icon" ] [ text "⚡" ]
+            div [ attr.``class`` "timeline-label" ] [ text (sprintf "Charge %d" stop.StopNumber) ]
+            div [ attr.``class`` "timeline-stop-meta" ] [
+                div [] [ text (sprintf "~%d min" minutes) ]
+                div [] [
+                    text (sprintf "%.0f%% → %.0f%%" stop.ArrivalSocPercent stop.TargetSocPercent)
+                ]
+            ]
+        ]
+
+    let chargingTimeline detailsView =
         div [ attr.``class`` "timeline-card" ] [
             h3 [ attr.``class`` "timeline-title" ] [ text "Trip timeline" ]
 
-            Doc.BindView (fun stopsText ->
-                let stops =
-                    match Int32.TryParse (stopsText : string) with
-                    | true, v when v > 0 -> v
-                    | _ -> 0
-
-                let stopNodes =
-                    [ 1 .. stops ]
-                    |> List.collect (fun i ->
+            Doc.BindView (fun details ->
+                let stopDocs =
+                    details
+                    |> List.collect (fun stop ->
                         [
                             timelineSeparator
-                            timelineNode "timeline-charge" "⚡" (sprintf "Charge %d" i)
+                            chargeNode stop
                         ]
                     )
 
                 let docs =
-                    [
-                        timelineNode "timeline-start" "●" "Start"
-                    ]
-                    @ stopNodes
-                    @ [
-                        timelineSeparator
-                        timelineNode "timeline-end" "🏁" "End"
-                    ]
+                    [ startNode ]
+                    @ stopDocs
+                    @ [ timelineSeparator; endNode ]
 
                 div [ attr.``class`` "timeline-row" ] docs
-            ) stopsView
+            ) detailsView
 
             div [ attr.``class`` "timeline-hint" ] [
-                text "Visual overview of the estimated trip structure."
+                text "Estimated trip structure with individual charging stops."
             ]
         ]
 
@@ -290,7 +303,7 @@ module Client =
                     chargingTimeHighlight chargingTimeText.View
                 ]
 
-                chargingTimeline chargingStopsText.View
+                chargingTimeline chargingStopDetails.View
 
                 resultRow "Available energy" availableEnergyText.View
                 resultRow "Available range" availableRangeText.View

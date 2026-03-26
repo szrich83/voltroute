@@ -16,6 +16,16 @@ module Calculations =
             TargetSocPercent : float
         }
 
+    type ChargingStop =
+        {
+            StopNumber : int
+            ArrivalSocPercent : float
+            TargetSocPercent : float
+            ChargedEnergyKWh : float
+            ChargeTimeHours : float
+            DriveDistanceKm : float
+        }
+
     type TripResult =
         {
             AvailableEnergyKWh : float
@@ -28,10 +38,18 @@ module Calculations =
             RemainingEnergyKWh : float
             RemainingSocPercent : float
             ChargingStops : int
+            ChargingStopDetails : ChargingStop list
         }
+
+    let clamp minValue maxValue value =
+        value |> max minValue |> min maxValue
 
     let calculateAvailableEnergy batteryCapacity socPercent =
         batteryCapacity * (socPercent / 100.0)
+
+    let calculateSocFromEnergy batteryCapacity energy =
+        if batteryCapacity <= 0.0 then 0.0
+        else (energy / batteryCapacity) * 100.0
 
     let calculateAvailableRange availableEnergy consumptionPer100Km =
         if consumptionPer100Km <= 0.0 then 0.0
@@ -82,20 +100,85 @@ module Calculations =
 
             loop fromSoc 0.0
 
-    let estimateChargingStops distanceKm startRangeKm perStopRangeKm =
-        if distanceKm <= startRangeKm then
-            0
-        else
-            let remainingAfterStart = distanceKm - startRangeKm
-            int (ceil (remainingAfterStart / perStopRangeKm))
+    let simulateChargingStops (input: TripInput) =
+        let targetSoc = clamp 20.0 95.0 input.TargetSocPercent
 
-    let normalizeTargetSoc targetSoc =
-        targetSoc
-        |> max 20.0
-        |> min 95.0
+        let startEnergy =
+            calculateAvailableEnergy input.BatteryCapacity input.StateOfChargePercent
+
+        let reserveSoc = 10.0
+        let reserveEnergy =
+            calculateAvailableEnergy input.BatteryCapacity reserveSoc
+
+        let rec loop stopNumber currentEnergy remainingDistance acc =
+            if remainingDistance <= 0.0 then
+                List.rev acc
+            else
+                let usableEnergyThisLeg =
+                    max 0.0 (currentEnergy - reserveEnergy)
+
+                let maxLegDistance =
+                    calculateAvailableRange usableEnergyThisLeg input.ConsumptionPer100Km
+
+                if remainingDistance <= maxLegDistance then
+                    List.rev acc
+                else
+                    let driveDistance = maxLegDistance
+
+                    let energyUsedThisLeg =
+                        calculateEnergyNeeded driveDistance input.ConsumptionPer100Km
+
+                    let arrivalEnergy =
+                        max 0.0 (currentEnergy - energyUsedThisLeg)
+
+                    let arrivalSoc =
+                        calculateSocFromEnergy input.BatteryCapacity arrivalEnergy
+
+                    let remainingAfterDrive =
+                        remainingDistance - driveDistance
+
+                    let energyNeededForRemaining =
+                        calculateEnergyNeeded remainingAfterDrive input.ConsumptionPer100Km
+
+                    let fullTargetEnergy =
+                        calculateAvailableEnergy input.BatteryCapacity targetSoc
+
+                    let energyNeededToFinishWithReserve =
+                        energyNeededForRemaining + reserveEnergy
+
+                    let nextTargetEnergy =
+                        min fullTargetEnergy energyNeededToFinishWithReserve
+
+                    let nextTargetSoc =
+                        calculateSocFromEnergy input.BatteryCapacity nextTargetEnergy
+                        |> clamp arrivalSoc 95.0
+
+                    let chargedEnergy =
+                        max 0.0 (nextTargetEnergy - arrivalEnergy)
+
+                    let chargeTime =
+                        estimateChargingTimeSegment
+                            input.BatteryCapacity
+                            input.ChargingPowerKw
+                            arrivalSoc
+                            nextTargetSoc
+
+                    let stop =
+                        {
+                            StopNumber = stopNumber
+                            ArrivalSocPercent = arrivalSoc
+                            TargetSocPercent = nextTargetSoc
+                            ChargedEnergyKWh = chargedEnergy
+                            ChargeTimeHours = chargeTime
+                            DriveDistanceKm = driveDistance
+                        }
+
+                    loop (stopNumber + 1) nextTargetEnergy remainingAfterDrive (stop :: acc)
+
+        loop 1 startEnergy input.DistanceKm []
 
     let calculateTrip (input: TripInput) =
-        let effectiveTargetSoc = normalizeTargetSoc input.TargetSocPercent
+        let effectiveTargetSoc = clamp 20.0 95.0 input.TargetSocPercent
 
         let availableEnergy =
             calculateAvailableEnergy input.BatteryCapacity input.StateOfChargePercent
@@ -118,27 +201,18 @@ module Calculations =
         let remainingSoc =
             calculateRemainingSoc remainingEnergy input.BatteryCapacity
 
-        let fullUsableEnergyPerStop =
-            input.BatteryCapacity * ((effectiveTargetSoc - 10.0) / 100.0)
-
-        let perStopRangeKm =
-            calculateAvailableRange fullUsableEnergyPerStop input.ConsumptionPer100Km
+        let stopDetails =
+            if energyNeeded <= availableEnergy then
+                []
+            else
+                simulateChargingStops { input with TargetSocPercent = effectiveTargetSoc }
 
         let chargingStops =
-            estimateChargingStops input.DistanceKm availableRange perStopRangeKm
+            List.length stopDetails
 
         let chargingTime =
-            if energyNeeded <= availableEnergy then
-                0.0
-            else
-                let perStopChargeTime =
-                    estimateChargingTimeSegment
-                        input.BatteryCapacity
-                        input.ChargingPowerKw
-                        10.0
-                        effectiveTargetSoc
-
-                float chargingStops * perStopChargeTime
+            stopDetails
+            |> List.sumBy (fun s -> s.ChargeTimeHours)
 
         {
             AvailableEnergyKWh = availableEnergy
@@ -151,4 +225,5 @@ module Calculations =
             RemainingEnergyKWh = remainingEnergy
             RemainingSocPercent = remainingSoc
             ChargingStops = chargingStops
+            ChargingStopDetails = stopDetails
         }

@@ -6,7 +6,7 @@ function isIDisposable(x){
 }
 function Main(){
   calculate();
-  const _1=Doc.Element("div", [Attr.Create("class", "page")], [Doc.Element("div", [Attr.Create("class", "hero")], [Doc.Element("h1", [Attr.Create("class", "title")], [Doc.TextNode("VoltRoute \u2013 EV Trip Planner")]), Doc.Element("p", [Attr.Create("class", "subtitle")], [Doc.TextNode("Estimate EV energy use, range, charging strategy, charging stops, and trip cost.")])]), Doc.Element("div", [Attr.Create("class", "card")], [Doc.Element("div", [Attr.Create("class", "grid")], [brandField(), modelField(), field("Battery capacity (kWh)", battery()), field("Consumption (kWh / 100 km)", consumption()), field("Trip distance (km)", distance()), field("Electricity price (\u20ac/kWh)", price()), field("State of charge (%)", soc()), field("Charging power (kW)", chargingPower()), field("Target charge (%)", targetSoc())]), Doc.Element("div", [Attr.Create("class", "button-row")], [Doc.Element("button", [Attr.Create("class", "calculate-button"), Attr.HandlerImpl("click", () =>() => calculate())], [Doc.TextNode("Calculate")])]), Doc.Element("div", [Attr.Create("class", "error-text")], [Doc.TextView(errorText().View)])]), Doc.Element("div", [Attr.Create("class", "card results-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("Results")]), Doc.Element("div", [Attr.Create("class", "highlight-stack")], [chargingStopsHighlight(chargingStopsText().View), chargingTimeHighlight(chargingTimeText().View)]), chargingTimeline(chargingStopsText().View), resultRow("Available energy", availableEnergyText().View), resultRow("Available range", availableRangeText().View), resultRow("Energy needed", energyNeededText().View), resultRow("Trip cost", tripCostText().View), statusRow("Needs charging", needsChargingText().View), resultRow("Charging needed", chargingNeededText().View), resultRow("Remaining energy", remainingEnergyText().View), resultRow("Remaining SOC", remainingSocText().View)])]);
+  const _1=Doc.Element("div", [Attr.Create("class", "page")], [Doc.Element("div", [Attr.Create("class", "hero")], [Doc.Element("h1", [Attr.Create("class", "title")], [Doc.TextNode("VoltRoute \u2013 EV Trip Planner")]), Doc.Element("p", [Attr.Create("class", "subtitle")], [Doc.TextNode("Estimate EV energy use, range, charging strategy, charging stops, and trip cost.")])]), Doc.Element("div", [Attr.Create("class", "card")], [Doc.Element("div", [Attr.Create("class", "grid")], [brandField(), modelField(), field("Battery capacity (kWh)", battery()), field("Consumption (kWh / 100 km)", consumption()), field("Trip distance (km)", distance()), field("Electricity price (\u20ac/kWh)", price()), field("State of charge (%)", soc()), field("Charging power (kW)", chargingPower()), field("Target charge (%)", targetSoc())]), Doc.Element("div", [Attr.Create("class", "button-row")], [Doc.Element("button", [Attr.Create("class", "calculate-button"), Attr.HandlerImpl("click", () =>() => calculate())], [Doc.TextNode("Calculate")])]), Doc.Element("div", [Attr.Create("class", "error-text")], [Doc.TextView(errorText().View)])]), Doc.Element("div", [Attr.Create("class", "card results-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("Results")]), Doc.Element("div", [Attr.Create("class", "highlight-stack")], [chargingStopsHighlight(chargingStopsText().View), chargingTimeHighlight(chargingTimeText().View)]), chargingTimeline(chargingStopDetails().View), resultRow("Available energy", availableEnergyText().View), resultRow("Available range", availableRangeText().View), resultRow("Energy needed", energyNeededText().View), resultRow("Trip cost", tripCostText().View), statusRow("Needs charging", needsChargingText().View), resultRow("Charging needed", chargingNeededText().View), resultRow("Remaining energy", remainingEnergyText().View), resultRow("Remaining SOC", remainingSocText().View)])]);
   LoadLocalTemplates("");
   Doc.RunById("main", _1);
 }
@@ -22,6 +22,7 @@ function calculate(){
     chargingNeededText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" kWh"))((x) => x))(result.ChargingNeededKWh));
     chargingTimeText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" h"))((x) => x))(result.ChargingTimeHours));
     chargingStopsText().Set(String(result.ChargingStops));
+    chargingStopDetails().Set(result.ChargingStopDetails);
     if(result.NeedsCharging){
       remainingEnergyText().Set("N/A");
       remainingSocText().Set("N/A");
@@ -33,6 +34,7 @@ function calculate(){
   }
   catch(m){
     errorText().Set("Invalid input. Please enter valid numeric values.");
+    chargingStopDetails().Set(FSharpList.Empty);
   }
 }
 function brandField(){
@@ -90,18 +92,15 @@ function chargingTimeHighlight(valueView){
 function chargingTimeText(){
   return _c.chargingTimeText;
 }
-function chargingTimeline(stopsView){
-  return Doc.Element("div", [Attr.Create("class", "timeline-card")], [Doc.Element("h3", [Attr.Create("class", "timeline-title")], [Doc.TextNode("Trip timeline")]), Doc.BindView((stopsText) => {
-    let o;
-    const m=(o=0,[TryParse(stopsText, {get:() => o, set:(v) => {
-      o=v;
-    }}), o]);
-    let _1=range(1, m[0]?m[1]>0?m[1]:0:0);
-    let _2=ofSeq(_1);
-    const stopNodes=collect_1((i) => ofArray([timelineSeparator(), timelineNode("timeline-charge", "\u26a1", (((_3) =>(_4) => _3("Charge "+String(_4)))((x) => x))(i))]), _2);
-    const docs=append_1(ofArray([timelineNode("timeline-start", "\u25cf", "Start")]), append_1(stopNodes, ofArray([timelineSeparator(), timelineNode("timeline-end", "\ud83c\udfc1", "End")])));
+function chargingTimeline(detailsView){
+  return Doc.Element("div", [Attr.Create("class", "timeline-card")], [Doc.Element("h3", [Attr.Create("class", "timeline-title")], [Doc.TextNode("Trip timeline")]), Doc.BindView((details) => {
+    const stopDocs=collect_1((stop) => ofArray([timelineSeparator(), chargeNode(stop)]), details);
+    const docs=append_1(ofArray([startNode()]), append_1(stopDocs, ofArray([timelineSeparator(), endNode()])));
     return Doc.Element("div", [Attr.Create("class", "timeline-row")], docs);
-  }, stopsView), Doc.Element("div", [Attr.Create("class", "timeline-hint")], [Doc.TextNode("Visual overview of the estimated trip structure.")])]);
+  }, detailsView), Doc.Element("div", [Attr.Create("class", "timeline-hint")], [Doc.TextNode("Estimated trip structure with individual charging stops.")])]);
+}
+function chargingStopDetails(){
+  return _c.chargingStopDetails;
 }
 function resultRow(labelText, valueView){
   return Doc.Element("div", [Attr.Create("class", "result-row")], [Doc.Element("span", [Attr.Create("class", "result-label")], [Doc.TextNode(labelText)]), Doc.Element("span", [Attr.Create("class", "result-value")], [Doc.TextView(valueView)])]);
@@ -149,28 +148,35 @@ function applyPreset(presetId){
     chargingPower().Set(String(preset.ChargingPowerKw));
   }
 }
-function timelineNode(className, iconText, labelText){
-  return Doc.Element("div", [Attr.Create("class", "timeline-node "+className)], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode(iconText)]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode(labelText)])]);
+function startNode(){
+  return _c.startNode;
 }
 function timelineSeparator(){
   return _c.timelineSeparator;
 }
-function range(min, max_1){
-  const count=1+max_1-min;
-  return count<=0?[]:init(count, (x) => x+min);
+function endNode(){
+  return _c.endNode;
 }
-function FailWith(msg){
-  throw new Error(msg);
+function chargeNode(stop){
+  const minutes=toInt(Math.round(stop.ChargeTimeHours*60));
+  return Doc.Element("div", [Attr.Create("class", "timeline-node timeline-charge")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u26a1")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode((((_1) =>(_2) => _1("Charge "+String(_2)))((x) => x))(stop.StopNumber))]), Doc.Element("div", [Attr.Create("class", "timeline-stop-meta")], [Doc.Element("div", [], [Doc.TextNode((((_1) =>(_2) => _1("~"+String(_2)+" min"))((x) => x))(minutes))]), Doc.Element("div", [], [Doc.TextNode(((((_1) =>(_2) =>(_3) => _1(_2.toFixed(0)+"% \u2192 "+_3.toFixed(0)+"%"))((x) => x))(stop.ArrivalSocPercent))(stop.TargetSocPercent))])])]);
 }
 function toInt(x){
   const u=toUInt(x);
   return u>2147483647?u-4294967296:u;
+}
+function FailWith(msg){
+  throw new Error(msg);
 }
 function toUInt(x){
   return(x<0?Math.ceil(x):Math.floor(x))>>>0;
 }
 function KeyValue(kvp){
   return[kvp.K, kvp.V];
+}
+function range(min, max_1){
+  const count=1+max_1-min;
+  return count<=0?[]:init(count, (x) => x+min);
 }
 class Object_1 {
   Equals(obj){
@@ -183,7 +189,7 @@ class Object_1 {
 class attr extends Object_1 { }
 class Var extends Object_1 { }
 function calculateTrip(input){
-  const effectiveTargetSoc=normalizeTargetSoc(input.TargetSocPercent);
+  const effectiveTargetSoc=clamp(20, 95, input.TargetSocPercent);
   const availableEnergy=calculateAvailableEnergy(input.BatteryCapacity, input.StateOfChargePercent);
   const availableRange=calculateAvailableRange(availableEnergy, input.ConsumptionPer100Km);
   const energyNeeded=calculateEnergyNeeded(input.DistanceKm, input.ConsumptionPer100Km);
@@ -191,20 +197,12 @@ function calculateTrip(input){
   const chargingNeeded=calculateChargingNeeded(energyNeeded, availableEnergy);
   const remainingEnergy=calculateRemainingEnergy(availableEnergy, energyNeeded);
   const remainingSoc=calculateRemainingSoc(remainingEnergy, input.BatteryCapacity);
-  const chargingStops=estimateChargingStops(input.DistanceKm, availableRange, calculateAvailableRange(input.BatteryCapacity*((effectiveTargetSoc-10)/100), input.ConsumptionPer100Km));
-  return New(availableEnergy, availableRange, energyNeeded, tripCost, energyNeeded>availableEnergy, chargingNeeded, energyNeeded<=availableEnergy?0:chargingStops*estimateChargingTimeSegment(input.BatteryCapacity, input.ChargingPowerKw, 10, effectiveTargetSoc), remainingEnergy, remainingSoc, chargingStops);
-}
-function normalizeTargetSoc(targetSoc_1){
-  const a=20;
-  const e=Compare(a, targetSoc_1)===1?a:targetSoc_1;
-  const a_1=95;
-  return Compare(a_1, e)===-1?a_1:e;
+  const stopDetails=energyNeeded<=availableEnergy?FSharpList.Empty:simulateChargingStops(New_1(input.BatteryCapacity, input.ConsumptionPer100Km, input.DistanceKm, input.ElectricityPrice, input.StateOfChargePercent, input.ChargingPowerKw, effectiveTargetSoc));
+  const chargingStops=length(stopDetails);
+  return New(availableEnergy, availableRange, energyNeeded, tripCost, energyNeeded>availableEnergy, chargingNeeded, sumBy((s) => s.ChargeTimeHours, stopDetails), remainingEnergy, remainingSoc, chargingStops, stopDetails);
 }
 function calculateAvailableEnergy(batteryCapacity, socPercent){
   return batteryCapacity*(socPercent/100);
-}
-function calculateAvailableRange(availableEnergy, consumptionPer100Km){
-  return consumptionPer100Km<=0?0:availableEnergy/consumptionPer100Km*100;
 }
 function calculateEnergyNeeded(distanceKm, consumptionPer100Km){
   return distanceKm/100*consumptionPer100Km;
@@ -214,8 +212,68 @@ function calculateRemainingEnergy(availableEnergy, energyNeeded){
   const b=availableEnergy-energyNeeded;
   return Compare(a, b)===1?a:b;
 }
-function estimateChargingStops(distanceKm, startRangeKm, perStopRangeKm){
-  return distanceKm<=startRangeKm?0:toInt(Math.ceil((distanceKm-startRangeKm)/perStopRangeKm));
+function simulateChargingStops(input){
+  const targetSoc_1=clamp(20, 95, input.TargetSocPercent);
+  const startEnergy=calculateAvailableEnergy(input.BatteryCapacity, input.StateOfChargePercent);
+  const reserveEnergy=calculateAvailableEnergy(input.BatteryCapacity, 10);
+  function loop(stopNumber, currentEnergy, remainingDistance, acc){
+    while(true)
+      {
+        if(remainingDistance<=0)return rev(acc);
+        else {
+          const a=0;
+          const b=currentEnergy-reserveEnergy;
+          const usableEnergyThisLeg=Compare(a, b)===1?a:b;
+          const maxLegDistance=calculateAvailableRange(usableEnergyThisLeg, input.ConsumptionPer100Km);
+          if(remainingDistance<=maxLegDistance)return rev(acc);
+          else {
+            const energyUsedThisLeg=calculateEnergyNeeded(maxLegDistance, input.ConsumptionPer100Km);
+            const a_1=0;
+            const b_1=currentEnergy-energyUsedThisLeg;
+            const arrivalEnergy=Compare(a_1, b_1)===1?a_1:b_1;
+            const arrivalSoc=calculateSocFromEnergy(input.BatteryCapacity, arrivalEnergy);
+            const remainingAfterDrive=remainingDistance-maxLegDistance;
+            const energyNeededForRemaining=calculateEnergyNeeded(remainingAfterDrive, input.ConsumptionPer100Km);
+            const fullTargetEnergy=calculateAvailableEnergy(input.BatteryCapacity, targetSoc_1);
+            const b_2=energyNeededForRemaining+reserveEnergy;
+            const nextTargetEnergy=Compare(fullTargetEnergy, b_2)===-1?fullTargetEnergy:b_2;
+            const x=calculateSocFromEnergy(input.BatteryCapacity, nextTargetEnergy);
+            const nextTargetSoc=(((arrivalSoc_1, m) =>(v) => clamp(arrivalSoc_1, m, v))(arrivalSoc, 95))(x);
+            const a_2=0;
+            const b_3=nextTargetEnergy-arrivalEnergy;
+            const chargedEnergy=Compare(a_2, b_3)===1?a_2:b_3;
+            const chargeTime=estimateChargingTimeSegment(input.BatteryCapacity, input.ChargingPowerKw, arrivalSoc, nextTargetSoc);
+            const stop=New_3(stopNumber, arrivalSoc, nextTargetSoc, chargedEnergy, chargeTime, maxLegDistance);
+            stopNumber=stopNumber+1;
+            currentEnergy=nextTargetEnergy;
+            remainingDistance=remainingAfterDrive;
+            acc=FSharpList.Cons(stop, acc);
+          }
+        }
+      }
+  }
+  return loop(1, startEnergy, input.DistanceKm, FSharpList.Empty);
+}
+function calculateRemainingSoc(remainingEnergy, batteryCapacity){
+  return batteryCapacity<=0?0:remainingEnergy/batteryCapacity*100;
+}
+function calculateChargingNeeded(energyNeeded, availableEnergy){
+  const a=0;
+  const b=energyNeeded-availableEnergy;
+  return Compare(a, b)===1?a:b;
+}
+function calculateTripCost(energyNeeded, electricityPrice){
+  return energyNeeded*electricityPrice;
+}
+function calculateAvailableRange(availableEnergy, consumptionPer100Km){
+  return consumptionPer100Km<=0?0:availableEnergy/consumptionPer100Km*100;
+}
+function clamp(minValue, maxValue, value){
+  const e=Compare(minValue, value)===1?minValue:value;
+  return Compare(maxValue, e)===-1?maxValue:e;
+}
+function calculateSocFromEnergy(batteryCapacity, energy){
+  return batteryCapacity<=0?0:energy/batteryCapacity*100;
 }
 function estimateChargingTimeSegment(batteryCapacity, chargingPowerKw, fromSoc, toSoc){
   if(batteryCapacity<=0||chargingPowerKw<=0||toSoc<=fromSoc)return 0;
@@ -237,21 +295,10 @@ function estimateChargingTimeSegment(batteryCapacity, chargingPowerKw, fromSoc, 
     return loop(fromSoc, 0);
   }
 }
-function calculateRemainingSoc(remainingEnergy, batteryCapacity){
-  return batteryCapacity<=0?0:remainingEnergy/batteryCapacity*100;
-}
-function calculateChargingNeeded(energyNeeded, availableEnergy){
-  const a=0;
-  const b=energyNeeded-availableEnergy;
-  return Compare(a, b)===1?a:b;
-}
-function calculateTripCost(energyNeeded, electricityPrice){
-  return energyNeeded*electricityPrice;
-}
 function chargingPowerFactor(soc_1){
   return soc_1<20?0.85:soc_1<60?1:soc_1<80?0.65:0.3;
 }
-function New(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, NeedsCharging, ChargingNeededKWh, ChargingTimeHours, RemainingEnergyKWh, RemainingSocPercent, ChargingStops){
+function New(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, NeedsCharging, ChargingNeededKWh, ChargingTimeHours, RemainingEnergyKWh, RemainingSocPercent, ChargingStops, ChargingStopDetails){
   return{
     AvailableEnergyKWh:AvailableEnergyKWh, 
     AvailableRangeKm:AvailableRangeKm, 
@@ -262,7 +309,8 @@ function New(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, Ne
     ChargingTimeHours:ChargingTimeHours, 
     RemainingEnergyKWh:RemainingEnergyKWh, 
     RemainingSocPercent:RemainingSocPercent, 
-    ChargingStops:ChargingStops
+    ChargingStops:ChargingStops, 
+    ChargingStopDetails:ChargingStopDetails
   };
 }
 function New_1(BatteryCapacity, ConsumptionPer100Km, DistanceKm, ElectricityPrice, StateOfChargePercent, ChargingPowerKw, TargetSocPercent){
@@ -275,6 +323,31 @@ function New_1(BatteryCapacity, ConsumptionPer100Km, DistanceKm, ElectricityPric
     ChargingPowerKw:ChargingPowerKw, 
     TargetSocPercent:TargetSocPercent
   };
+}
+class FSharpList {
+  static Empty=Create_1(FSharpList, {$:0});
+  static Cons(Head, Tail){
+    return Create_1(FSharpList, {
+      $:1, 
+      $0:Head, 
+      $1:Tail
+    });
+  }
+  GetEnumerator(){
+    return new T(this, null, (e) => {
+      const m=e.s;
+      if(m.$==0)return false;
+      else {
+        const xs=m.$1;
+        e.c=m.$0;
+        e.s=xs;
+        return true;
+      }
+    }, void 0);
+  }
+  $;
+  $0;
+  $1;
 }
 class Attr {
   static Create(name, value){
@@ -415,35 +488,21 @@ function append(s1, s2){
     });
   }};
 }
-function init(n, f){
-  return take(n, initInfinite(f));
+function sumBy(f, s){
+  let res=0;
+  const e=Get(s);
+  try {
+    while(e.MoveNext())
+      res=res+f(e.Current);
+  }
+  finally {
+    const _1=e;
+    if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
+  }
+  return res;
 }
 function collect(f, s){
   return concat(map(f, s));
-}
-function take(n, s){
-  n<0?nonNegative():void 0;
-  return{GetEnumerator:() => {
-    const e=[Get(s)];
-    return new T(0, null, (o) => {
-      o.s=o.s+1;
-      if(o.s>n)return false;
-      else {
-        const en=e[0];
-        return Equals(en, null)?insufficient():en.MoveNext()?(o.c=en.Current,o.s===n?(en.Dispose(),e[0]=null):void 0,true):(en.Dispose(),e[0]=null,insufficient());
-      }
-    }, () => {
-      const x=e[0];
-      if(!Equals(x, null))x.Dispose();
-    });
-  }};
-}
-function initInfinite(f){
-  return{GetEnumerator:() => new T(0, null, (e) => {
-    e.c=f(e.s);
-    e.s=e.s+1;
-    return true;
-  }, void 0)};
 }
 function concat(ss){
   return{GetEnumerator:() => {
@@ -565,6 +624,33 @@ function iter(p, s){
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
 }
+function init(n, f){
+  return take(n, initInfinite(f));
+}
+function take(n, s){
+  n<0?nonNegative():void 0;
+  return{GetEnumerator:() => {
+    const e=[Get(s)];
+    return new T(0, null, (o) => {
+      o.s=o.s+1;
+      if(o.s>n)return false;
+      else {
+        const en=e[0];
+        return Equals(en, null)?insufficient():en.MoveNext()?(o.c=en.Current,o.s===n?(en.Dispose(),e[0]=null):void 0,true):(en.Dispose(),e[0]=null,insufficient());
+      }
+    }, () => {
+      const x=e[0];
+      if(!Equals(x, null))x.Dispose();
+    });
+  }};
+}
+function initInfinite(f){
+  return{GetEnumerator:() => new T(0, null, (e) => {
+    e.c=f(e.s);
+    e.s=e.s+1;
+    return true;
+  }, void 0)};
+}
 function forall(p, s){
   return!exists((x) =>!p(x), s);
 }
@@ -639,11 +725,21 @@ function map_1(f, x){
 }
 function ofArray(arr){
   let r=FSharpList.Empty;
-  for(let i=length(arr)-1, _1=0;i>=_1;i--)r=FSharpList.Cons(get(arr, i), r);
+  for(let i=length_1(arr)-1, _1=0;i>=_1;i--)r=FSharpList.Cons(get(arr, i), r);
   return r;
 }
 function collect_1(f, l){
   return ofSeq(collect(f, l));
+}
+function length(l){
+  let r=l;
+  let i=0;
+  while(r.$==1)
+    {
+      r=tail(r);
+      i=i+1;
+    }
+  return i;
 }
 function ofSeq(s){
   if(s instanceof FSharpList)return s;
@@ -734,6 +830,16 @@ function filter(p, x){
     return res;
   }
 }
+function rev(l){
+  let res=FSharpList.Empty;
+  let r=l;
+  while(r.$==1)
+    {
+      res=FSharpList.Cons(r.$0, res);
+      r=r.$1;
+    }
+  return res;
+}
 function distinct_1(l){
   return ofSeq(distinct(l));
 }
@@ -742,14 +848,14 @@ function sort(l){
   sortInPlace(a);
   return ofArray(a);
 }
-function head_1(l){
-  return l.$==1?l.$0:listEmpty();
-}
 function tail(l){
   return l.$==1?l.$1:listEmpty();
 }
 function listEmpty(){
   return FailWith("The input list was empty.");
+}
+function head_1(l){
+  return l.$==1?l.$0:listEmpty();
 }
 function Map(fn, a){
   return CreateLazy(() => Map_1(fn, a()));
@@ -806,7 +912,10 @@ let _c=Lazy((_i) => class $StartupCode_Client {
   static {
     _c=_i(this);
   }
+  static endNode;
+  static startNode;
   static timelineSeparator;
+  static chargingStopDetails;
   static errorText;
   static chargingStopsText;
   static remainingSocText;
@@ -848,151 +957,12 @@ let _c=Lazy((_i) => class $StartupCode_Client {
     this.remainingSocText=_c_2.Create_1("-");
     this.chargingStopsText=_c_2.Create_1("-");
     this.errorText=_c_2.Create_1("");
+    this.chargingStopDetails=_c_2.Create_1(FSharpList.Empty);
     this.timelineSeparator=Doc.Element("div", [Attr.Create("class", "timeline-separator")], []);
+    this.startNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-start")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u25cf")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("Start")])]);
+    this.endNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-end")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\ud83c\udfc1")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("End")])]);
   }
 });
-function Equals(a, b){
-  if(a===b)return true;
-  else {
-    const m=typeof a;
-    if(m=="object"){
-      if(a===null||a===void 0||b===null||b===void 0||!Equals(typeof b, "object"))return false;
-      else if("Equals"in a)return a.Equals(b);
-      else if("Equals"in b)return false;
-      else if(a instanceof Array&&b instanceof Array)return arrayEquals(a, b);
-      else if(a instanceof Date&&b instanceof Date)return dateEquals(a, b);
-      else {
-        const a_1=a;
-        const b_1=b;
-        const eqR=[true];
-        let k;
-        for(var k_2 in a_1)if(((k_3) => {
-          eqR[0]=!a_1.hasOwnProperty(k_3)||b_1.hasOwnProperty(k_3)&&Equals(a_1[k_3], b_1[k_3]);
-          return!eqR[0];
-        })(k_2))break;
-        if(eqR[0]){
-          let k_1;
-          for(var k_3 in b_1)if(((k_4) => {
-            eqR[0]=!b_1.hasOwnProperty(k_4)||a_1.hasOwnProperty(k_4);
-            return!eqR[0];
-          })(k_3))break;
-        }
-        return eqR[0];
-      }
-    }
-    else return m=="function"&&("$Func"in a?a.$Func===b.$Func&&a.$Target===b.$Target:"$Invokes"in a&&"$Invokes"in b&&arrayEquals(a.$Invokes, b.$Invokes));
-  }
-}
-function arrayEquals(a, b){
-  let eq;
-  let i;
-  if(length(a)===length(b)){
-    eq=true;
-    i=0;
-    while(eq&&i<length(a))
-      {
-        !Equals(get(a, i), get(b, i))?eq=false:void 0;
-        i=i+1;
-      }
-    return eq;
-  }
-  else return false;
-}
-function dateEquals(a, b){
-  return a.getTime()===b.getTime();
-}
-function Compare(a, b){
-  if(a===b)return 0;
-  else {
-    const m=typeof a;
-    switch(m=="boolean"?1:m=="number"?1:m=="bigint"?1:m=="string"?1:m=="object"?2:m=="function"?3:m=="symbol"?4:0){
-      case 0:
-        return typeof b=="undefined"?0:-1;
-      case 1:
-        return a<b?-1:1;
-      case 2:
-        if(a===null)return -1;
-        else if(b===null)return 1;
-        else if("CompareTo"in a)return a.CompareTo(b);
-        else if("CompareTo0"in a)return a.CompareTo0(b);
-        else if(a instanceof Array&&b instanceof Array)return compareArrays(a, b);
-        else if(a instanceof Date&&b instanceof Date)return compareDates(a, b);
-        else {
-          const a_1=a;
-          const b_1=b;
-          const cmp=[0];
-          let k;
-          for(var k_2 in a_1)if(((k_3) =>!a_1.hasOwnProperty(k_3)?false:!b_1.hasOwnProperty(k_3)?(cmp[0]=1,true):(cmp[0]=Compare(a_1[k_3], b_1[k_3]),cmp[0]!==0))(k_2))break;
-          if(cmp[0]===0){
-            let k_1;
-            for(var k_3 in b_1)if(((k_4) =>!b_1.hasOwnProperty(k_4)?false:!a_1.hasOwnProperty(k_4)&&(cmp[0]=-1,true))(k_3))break;
-          }
-          return cmp[0];
-        }
-        break;
-      case 3:
-        return FailWith("Cannot compare function values.");
-      case 4:
-        return FailWith("Cannot compare symbol values.");
-    }
-  }
-}
-function compareArrays(a, b){
-  let cmp;
-  let i;
-  if(length(a)<length(b))return -1;
-  else if(length(a)>length(b))return 1;
-  else {
-    cmp=0;
-    i=0;
-    while(cmp===0&&i<length(a))
-      {
-        cmp=Compare(get(a, i), get(b, i));
-        i=i+1;
-      }
-    return cmp;
-  }
-}
-function compareDates(a, b){
-  return Compare(a.getTime(), b.getTime());
-}
-function Hash(o){
-  const m=typeof o;
-  return m=="function"?0:m=="boolean"?o?1:0:m=="number"?o:m=="string"?hashString(o):m=="object"?o==null?0:o instanceof Array?hashArray(o):hashObject(o):m=="bigint"?hashString(String(o)):m=="symbol"?hashString(o.description):0;
-}
-function hashString(s){
-  let hash;
-  if(s===null)return 0;
-  else {
-    hash=5381;
-    for(let i=0, _1=s.length-1;i<=_1;i++)hash=hashMix(hash, s[i].charCodeAt());
-    return hash;
-  }
-}
-function hashArray(o){
-  let h=-34948909;
-  for(let i=0, _1=length(o)-1;i<=_1;i++)h=hashMix(h, Hash(get(o, i)));
-  return h;
-}
-function hashObject(o){
-  if("GetHashCode"in o)return o.GetHashCode();
-  else {
-    const ____=hashMix;
-    const h=[0];
-    let k;
-    for(var k_1 in o)if(((key) => {
-      h[0]=____(____(h[0], hashString(key)), Hash(o[key]));
-      return false;
-    })(k_1))break;
-    return h[0];
-  }
-}
-function hashMix(x, y){
-  return(x<<5)+x+y;
-}
-function TryParse(s, r){
-  return TryParse_1(s, -2147483648, 2147483647, r);
-}
 function LoadLocalTemplates(baseName){
   !LocalTemplatesLoaded()?(set_LocalTemplatesLoaded(true),LoadNestedTemplates(globalThis.document.body, "")):void 0;
   LoadedTemplates().set_Item(baseName, LoadedTemplateFile(""));
@@ -1282,6 +1252,19 @@ function PrepareSingleTemplate(baseName, name, el){
 function TextHoleRE(){
   return _c_3.TextHoleRE;
 }
+function New_3(StopNumber, ArrivalSocPercent, TargetSocPercent, ChargedEnergyKWh, ChargeTimeHours, DriveDistanceKm){
+  return{
+    StopNumber:StopNumber, 
+    ArrivalSocPercent:ArrivalSocPercent, 
+    TargetSocPercent:TargetSocPercent, 
+    ChargedEnergyKWh:ChargedEnergyKWh, 
+    ChargeTimeHours:ChargeTimeHours, 
+    DriveDistanceKm:DriveDistanceKm
+  };
+}
+function TryParse(s, r){
+  return TryParse_2(s, -2147483648, 2147483647, r);
+}
 function Updates(dyn){
   return MapTreeReduce((x) => x.NChanged, Const(), Map2Unit, dyn.DynNodes);
 }
@@ -1318,7 +1301,7 @@ function Insert(elem, tree){
   }
   loop(tree);
   const arr=nodes.slice(0);
-  let _1=New_3(elem, Flags(tree), arr, oar.length===0?null:Some((el) => {
+  let _1=New_4(elem, Flags(tree), arr, oar.length===0?null:Some((el) => {
     iter((f) => {
       f(el);
     }, oar);
@@ -1449,7 +1432,7 @@ function Get(x){
 function ArrayEnumerator(s){
   return new T(0, null, (e) => {
     const i=e.s;
-    return i<length(s)&&(e.c=get(s, i),e.s=i+1,true);
+    return i<length_1(s)&&(e.c=get(s, i),e.s=i+1,true);
   }, void 0);
 }
 function StringEnumerator(s){
@@ -1487,6 +1470,145 @@ class T extends Object_1 {
     this.e=0;
   }
 }
+function Equals(a, b){
+  if(a===b)return true;
+  else {
+    const m=typeof a;
+    if(m=="object"){
+      if(a===null||a===void 0||b===null||b===void 0||!Equals(typeof b, "object"))return false;
+      else if("Equals"in a)return a.Equals(b);
+      else if("Equals"in b)return false;
+      else if(a instanceof Array&&b instanceof Array)return arrayEquals(a, b);
+      else if(a instanceof Date&&b instanceof Date)return dateEquals(a, b);
+      else {
+        const a_1=a;
+        const b_1=b;
+        const eqR=[true];
+        let k;
+        for(var k_2 in a_1)if(((k_3) => {
+          eqR[0]=!a_1.hasOwnProperty(k_3)||b_1.hasOwnProperty(k_3)&&Equals(a_1[k_3], b_1[k_3]);
+          return!eqR[0];
+        })(k_2))break;
+        if(eqR[0]){
+          let k_1;
+          for(var k_3 in b_1)if(((k_4) => {
+            eqR[0]=!b_1.hasOwnProperty(k_4)||a_1.hasOwnProperty(k_4);
+            return!eqR[0];
+          })(k_3))break;
+        }
+        return eqR[0];
+      }
+    }
+    else return m=="function"&&("$Func"in a?a.$Func===b.$Func&&a.$Target===b.$Target:"$Invokes"in a&&"$Invokes"in b&&arrayEquals(a.$Invokes, b.$Invokes));
+  }
+}
+function arrayEquals(a, b){
+  let eq;
+  let i;
+  if(length_1(a)===length_1(b)){
+    eq=true;
+    i=0;
+    while(eq&&i<length_1(a))
+      {
+        !Equals(get(a, i), get(b, i))?eq=false:void 0;
+        i=i+1;
+      }
+    return eq;
+  }
+  else return false;
+}
+function dateEquals(a, b){
+  return a.getTime()===b.getTime();
+}
+function Compare(a, b){
+  if(a===b)return 0;
+  else {
+    const m=typeof a;
+    switch(m=="boolean"?1:m=="number"?1:m=="bigint"?1:m=="string"?1:m=="object"?2:m=="function"?3:m=="symbol"?4:0){
+      case 0:
+        return typeof b=="undefined"?0:-1;
+      case 1:
+        return a<b?-1:1;
+      case 2:
+        if(a===null)return -1;
+        else if(b===null)return 1;
+        else if("CompareTo"in a)return a.CompareTo(b);
+        else if("CompareTo0"in a)return a.CompareTo0(b);
+        else if(a instanceof Array&&b instanceof Array)return compareArrays(a, b);
+        else if(a instanceof Date&&b instanceof Date)return compareDates(a, b);
+        else {
+          const a_1=a;
+          const b_1=b;
+          const cmp=[0];
+          let k;
+          for(var k_2 in a_1)if(((k_3) =>!a_1.hasOwnProperty(k_3)?false:!b_1.hasOwnProperty(k_3)?(cmp[0]=1,true):(cmp[0]=Compare(a_1[k_3], b_1[k_3]),cmp[0]!==0))(k_2))break;
+          if(cmp[0]===0){
+            let k_1;
+            for(var k_3 in b_1)if(((k_4) =>!b_1.hasOwnProperty(k_4)?false:!a_1.hasOwnProperty(k_4)&&(cmp[0]=-1,true))(k_3))break;
+          }
+          return cmp[0];
+        }
+        break;
+      case 3:
+        return FailWith("Cannot compare function values.");
+      case 4:
+        return FailWith("Cannot compare symbol values.");
+    }
+  }
+}
+function compareArrays(a, b){
+  let cmp;
+  let i;
+  if(length_1(a)<length_1(b))return -1;
+  else if(length_1(a)>length_1(b))return 1;
+  else {
+    cmp=0;
+    i=0;
+    while(cmp===0&&i<length_1(a))
+      {
+        cmp=Compare(get(a, i), get(b, i));
+        i=i+1;
+      }
+    return cmp;
+  }
+}
+function compareDates(a, b){
+  return Compare(a.getTime(), b.getTime());
+}
+function Hash(o){
+  const m=typeof o;
+  return m=="function"?0:m=="boolean"?o?1:0:m=="number"?o:m=="string"?hashString(o):m=="object"?o==null?0:o instanceof Array?hashArray(o):hashObject(o):m=="bigint"?hashString(String(o)):m=="symbol"?hashString(o.description):0;
+}
+function hashString(s){
+  let hash;
+  if(s===null)return 0;
+  else {
+    hash=5381;
+    for(let i=0, _1=s.length-1;i<=_1;i++)hash=hashMix(hash, s[i].charCodeAt());
+    return hash;
+  }
+}
+function hashArray(o){
+  let h=-34948909;
+  for(let i=0, _1=length_1(o)-1;i<=_1;i++)h=hashMix(h, Hash(get(o, i)));
+  return h;
+}
+function hashObject(o){
+  if("GetHashCode"in o)return o.GetHashCode();
+  else {
+    const ____=hashMix;
+    const h=[0];
+    let k;
+    for(var k_1 in o)if(((key) => {
+      h[0]=____(____(h[0], hashString(key)), Hash(o[key]));
+      return false;
+    })(k_1))break;
+    return h[0];
+  }
+}
+function hashMix(x, y){
+  return(x<<5)+x+y;
+}
 let _c_1=Lazy((_i) => class $StartupCode_VehiclePresets {
   static {
     _c_1=_i(this);
@@ -1498,31 +1620,6 @@ let _c_1=Lazy((_i) => class $StartupCode_VehiclePresets {
     this.brands=sort(distinct_1(map_1((p) => p.Brand, presets())));
   }
 });
-class FSharpList {
-  static Empty=Create_1(FSharpList, {$:0});
-  static Cons(Head, Tail){
-    return Create_1(FSharpList, {
-      $:1, 
-      $0:Head, 
-      $1:Tail
-    });
-  }
-  GetEnumerator(){
-    return new T(this, null, (e) => {
-      const m=e.s;
-      if(m.$==0)return false;
-      else {
-        const xs=m.$1;
-        e.c=m.$0;
-        e.s=xs;
-        return true;
-      }
-    }, void 0);
-  }
-  $;
-  $0;
-  $1;
-}
 function Map_1(fn, sn){
   const m=sn.s;
   if(m!=null&&m.$==0)return{s:Forever(fn(m.$0))};
@@ -1564,7 +1661,7 @@ function EnqueueSafe(q, x){
   if(q.length%20===0){
     const qcopy=q.slice(0);
     Clear(q);
-    for(let i=0, _1=length(qcopy)-1;i<=_1;i++){
+    for(let i=0, _1=length_1(qcopy)-1;i<=_1;i++){
       const o=get(qcopy, i);
       if(typeof o=="object")(((sn) => {
         if(sn.s)q.push(sn);
@@ -1581,7 +1678,7 @@ function MarkForever(sn, v){
   if(m!=null&&m.$==3){
     const q=m.$0;
     sn.s=Forever(v);
-    for(let i=0, _1=length(q)-1;i<=_1;i++)(get(q, i))(v);
+    for(let i=0, _1=length_1(q)-1;i<=_1;i++)(get(q, i))(v);
   }
   else void 0;
 }
@@ -1591,7 +1688,7 @@ function MarkReady(sn, v){
     const q2=m.$1;
     const q1=m.$0;
     sn.s=Ready(v, q2);
-    for(let i=0, _1=length(q1)-1;i<=_1;i++)(get(q1, i))(v);
+    for(let i=0, _1=length_1(q1)-1;i<=_1;i++)(get(q1, i))(v);
   }
   else void 0;
 }
@@ -1679,7 +1776,7 @@ function get(arr, n){
   checkBounds(arr, n);
   return arr[n];
 }
-function length(arr){
+function length_1(arr){
   return arr.dims===2?arr.length*arr.length:arr.length;
 }
 function checkBounds(arr, n){
@@ -1708,7 +1805,7 @@ function ofSeqNonCopying(xs){
   }
 }
 function TreeReduce(defaultValue, reduction, array){
-  const l=length(array);
+  const l=length_1(array);
   function loop(off){
     return(len) => {
       let _1;
@@ -1726,7 +1823,7 @@ function TreeReduce(defaultValue, reduction, array){
   return(loop(0))(l);
 }
 function MapTreeReduce(mapping, defaultValue, reduction, array){
-  const l=length(array);
+  const l=length_1(array);
   function loop(off){
     return(len) => {
       let _1;
@@ -1752,12 +1849,6 @@ let _c_2=Lazy((_i) => class Var_1 extends Object_1 {
   }
   static { }
 });
-function TryParse_1(s, min, max_1, r){
-  const x=+s;
-  const ok=x===x-x%1&&x>=min&&x<=max_1;
-  if(ok)r.set(x);
-  return ok;
-}
 function GetFieldValues(o){
   let r=[];
   let k;
@@ -1815,7 +1906,7 @@ class Dictionary extends Object_1 {
     if(d==null)return false;
     else {
       const r=filter_1((a) =>!this.equals.apply(null, [(KeyValue(a))[0], k]), d);
-      return length(r)<d.length&&(this.count=this.count-1,this.data[h]=r,true);
+      return length_1(r)<d.length&&(this.count=this.count-1,this.data[h]=r,true);
     }
   }
   Item(k){
@@ -1869,7 +1960,7 @@ function Obsolete(sn){
   if(m==null||(m!=null&&m.$==2?(_1=m.$1,false):m!=null&&m.$==3?(_1=m.$1,false):true))void 0;
   else {
     sn.s=null;
-    for(let i=0, _2=length(_1)-1;i<=_2;i++){
+    for(let i=0, _2=length_1(_1)-1;i<=_2;i++){
       const o=get(_1, i);
       if(typeof o=="object")(((sn_1) => {
         Obsolete(sn_1);
@@ -1894,7 +1985,7 @@ function sortInPlace(arr){
 function exists_1(f, x){
   let e=false;
   let i=0;
-  const l=length(x);
+  const l=length_1(x);
   while(!e&&i<l)
     if(f(x[i]))e=true;
     else i=i+1;
@@ -1988,7 +2079,7 @@ function init_1(size, f){
 function forall_1(f, x){
   let a=true;
   let i=0;
-  const l=length(x);
+  const l=length_1(x);
   while(a&&i<l)
     if(f(x[i]))i=i+1;
     else a=false;
@@ -2082,7 +2173,7 @@ function InsertDoc(parent, doc, pos){
     }
 }
 function CreateRunState(parent, doc){
-  return New_4(get_Empty_1(), CreateElemNode(parent, EmptyAttr(), doc));
+  return New_5(get_Empty_1(), CreateElemNode(parent, EmptyAttr(), doc));
 }
 function PerformAnimatedUpdate(childrenOnly, st, doc){
   return get_UseAnimations()?Delay(() => {
@@ -2535,28 +2626,6 @@ function set_counter(_1){
 function counter(){
   return _c_6.counter;
 }
-function nonNegative(){
-  return FailWith("The input must be non-negative.");
-}
-function insufficient(){
-  return FailWith("The input sequence has an insufficient number of elements.");
-}
-function mapiInPlace(f, arr){
-  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(i, arr[i]);
-  return arr;
-}
-function mapInPlace(f, arr){
-  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(arr[i]);
-}
-function arrContains(item, arr){
-  let c=true;
-  let i=0;
-  const l=length(arr);
-  while(c&&i<l)
-    if(Equals(arr[i], item))c=false;
-    else i=i+1;
-  return!c;
-}
 class TemplateHole extends Object_1 { }
 function notPresent(){
   throw new KeyNotFoundException("New");
@@ -2723,6 +2792,28 @@ function string(source, start, finish){
     return f_1<0?"":source.slice(s, f_1+1);
   }
 }
+function insufficient(){
+  return FailWith("The input sequence has an insufficient number of elements.");
+}
+function mapiInPlace(f, arr){
+  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(i, arr[i]);
+  return arr;
+}
+function mapInPlace(f, arr){
+  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(arr[i]);
+}
+function arrContains(item, arr){
+  let c=true;
+  let i=0;
+  const l=length_1(arr);
+  while(c&&i<l)
+    if(Equals(arr[i], item))c=false;
+    else i=i+1;
+  return!c;
+}
+function nonNegative(){
+  return FailWith("The input must be non-negative.");
+}
 class KeyCollection extends Object_1 {
   d;
   GetEnumerator(){
@@ -2820,7 +2911,7 @@ class Updates_1 {
     });
   }
 }
-function New_3(DynElem, DynFlags, DynNodes, OnAfterRender){
+function New_4(DynElem, DynFlags, DynNodes, OnAfterRender){
   const _1={
     DynElem:DynElem, 
     DynFlags:DynFlags, 
@@ -2895,7 +2986,7 @@ let _c_4=Lazy((_i) => class Client {
       if(isBlank(s_8))return Some(-8640000000000000);
       else {
         o=0;
-        const m_1=TryParse_2(s_8);
+        const m_1=TryParse_1(s_8);
         let _1=m_1!=null&&m_1.$==1&&(o=m_1.$0,true);
         m=[_1, o];
         return m[0]?Some(m[1]):null;
@@ -3003,7 +3094,7 @@ function SplitWith(str, pat){
 function protect(s){
   return s==null?"":s;
 }
-function New_4(PreviousNodes, Top){
+function New_5(PreviousNodes, Top){
   return{PreviousNodes:PreviousNodes, Top:Top};
 }
 function get_Empty_1(){
@@ -3081,7 +3172,7 @@ function Delay(mk){
 }
 function Bind_1(r, f){
   return checkCancel((c) => {
-    r(New_5((a) => {
+    r(New_6((a) => {
       if(a.$==0){
         const x=a.$0;
         scheduler().Fork(() => {
@@ -3106,7 +3197,7 @@ function Start(c, ctOpt){
   const d=(defCTS())[0];
   const ct=ctOpt==null?d:ctOpt.$0;
   scheduler().Fork(() => {
-    if(!ct.c)c(New_5((a) => {
+    if(!ct.c)c(New_6((a) => {
       if(a.$==1)UncaughtAsyncError(a.$0);
     }, ct));
   });
@@ -3172,7 +3263,7 @@ function Finalize(a){
 }
 function ConcatActions(xs){
   const xs_1=ofSeqNonCopying(xs);
-  const m=length(xs_1);
+  const m=length_1(xs_1);
   if(m===0)return Const_1();
   else if(m===1)return get(xs_1, 0);
   else {
@@ -3210,7 +3301,7 @@ let _c_5=Lazy((_i) => class Proxy {
   }
 });
 function Clear(a){
-  a.splice(0, length(a));
+  a.splice(0, length_1(a));
 }
 function isBlank(s){
   return forall_2(IsWhiteSpace, s);
@@ -3355,9 +3446,15 @@ class DynamicAttrNode extends Object_1 {
 function IsWhiteSpace(c){
   return c.match(new RegExp("\\s"))!==null;
 }
-function TryParse_2(s){
+function TryParse_1(s){
   const d=Date.parse(s);
   return isNaN(d)?null:Some(d);
+}
+function TryParse_2(s, min, max_1, r){
+  const x=+s;
+  const ok=x===x-x%1&&x>=min&&x<=max_1;
+  if(ok)r.set(x);
+  return ok;
 }
 class KeyNotFoundException extends Error {
   constructor(i, _1){
@@ -3411,7 +3508,7 @@ class Easing extends Object_1 {
     this.transformTime=transformTime;
   }
 }
-function New_5(k, ct){
+function New_6(k, ct){
   return{k:k, ct:ct};
 }
 function No(Item){
@@ -3433,7 +3530,7 @@ let _c_9=Lazy((_i) => class $StartupCode_Concurrency {
   static scheduler;
   static noneCT;
   static {
-    this.noneCT=New_6(false, []);
+    this.noneCT=New_7(false, []);
     this.scheduler=new Scheduler();
     this.defCTS=[new CancellationTokenSource()];
     this.Zero=Return();
@@ -3442,7 +3539,7 @@ let _c_9=Lazy((_i) => class $StartupCode_Concurrency {
     };
   }
 });
-function New_6(IsCancellationRequested, Registrations){
+function New_7(IsCancellationRequested, Registrations){
   return{c:IsCancellationRequested, r:Registrations};
 }
 function Filter_1(ok, set_1){
@@ -3562,7 +3659,7 @@ class OperationCanceledException extends Error {
   }
 }
 function Create(f){
-  return New_7(false, f, forceLazy);
+  return New_8(false, f, forceLazy);
 }
 function forceLazy(){
   const v=this.v();
@@ -3583,7 +3680,7 @@ let _c_10=Lazy((_i) => class $StartupCode_AppendList {
     this.Empty={$:0};
   }
 });
-function New_7(created, evalOrVal, force){
+function New_8(created, evalOrVal, force){
   return{
     c:created, 
     v:evalOrVal, 
