@@ -1,6 +1,5 @@
 namespace VoltRoute
 
-open System
 open WebSharper
 open WebSharper.JavaScript
 open WebSharper.UI
@@ -100,18 +99,19 @@ module Client =
             span [ attr.``class`` "result-label" ] [ text labelText ]
 
             span [ attr.``class`` "result-value" ] [
-                Doc.BindView (fun v ->
-                    let isYes = (v = "Yes")
+                Doc.BindView
+                    (fun v ->
+                        let isYes = (v = "Yes")
 
-                    span [
-                        attr.``class`` (
-                            "status-badge " +
-                            (if isYes then "status-yes" else "status-no")
-                        )
-                    ] [
-                        text v
-                    ]
-                ) valueView
+                        span [
+                            attr.``class`` (
+                                "status-badge " +
+                                (if isYes then "status-yes" else "status-no")
+                            )
+                        ] [
+                            text v
+                        ])
+                    valueView
             ]
         ]
 
@@ -144,24 +144,22 @@ module Client =
 
     let startNode =
         div [ attr.``class`` "timeline-node timeline-start" ] [
-            div [ attr.``class`` "timeline-icon" ] [ text "●" ]
+            div [ attr.``class`` "timeline-icon" ] [ text "◎" ]
             div [ attr.``class`` "timeline-label" ] [ text "Start" ]
         ]
 
     let endNode =
         div [ attr.``class`` "timeline-node timeline-end" ] [
-            div [ attr.``class`` "timeline-icon" ] [ text "🏁" ]
+            div [ attr.``class`` "timeline-icon" ] [ text "⚑" ]
             div [ attr.``class`` "timeline-label" ] [ text "End" ]
         ]
 
     let chargeNode (stop: ChargingStop) =
-        let minutes = int (Math.Round(stop.ChargeTimeHours * 60.0))
-
         div [ attr.``class`` "timeline-node timeline-charge" ] [
-            div [ attr.``class`` "timeline-icon" ] [ text "⚡" ]
+            div [ attr.``class`` "timeline-icon" ] [ text "↯" ]
             div [ attr.``class`` "timeline-label" ] [ text (sprintf "Charge %d" stop.StopNumber) ]
             div [ attr.``class`` "timeline-stop-meta" ] [
-                div [] [ text (sprintf "~%d min" minutes) ]
+                div [] [ text (sprintf "~%d min" stop.ChargeTimeMinutes) ]
                 div [] [
                     text (sprintf "%.0f%% → %.0f%%" stop.ArrivalSocPercent stop.TargetSocPercent)
                 ]
@@ -172,23 +170,20 @@ module Client =
         div [ attr.``class`` "timeline-card" ] [
             h3 [ attr.``class`` "timeline-title" ] [ text "Trip timeline" ]
 
-            Doc.BindView (fun details ->
-                let stopDocs =
-                    details
-                    |> List.collect (fun stop ->
-                        [
-                            timelineSeparator
-                            chargeNode stop
-                        ]
-                    )
+            Doc.BindView
+                (fun details ->
+                    let rec build docs remainingStops =
+                        match remainingStops with
+                        | [] ->
+                            docs @ [ timelineSeparator; endNode ]
+                        | stop :: tail ->
+                            build (docs @ [ timelineSeparator; chargeNode stop ]) tail
 
-                let docs =
-                    [ startNode ]
-                    @ stopDocs
-                    @ [ timelineSeparator; endNode ]
+                    let docs =
+                        build [ startNode ] details
 
-                div [ attr.``class`` "timeline-row" ] docs
-            ) detailsView
+                    div [ attr.``class`` "timeline-row" ] docs)
+                detailsView
 
             div [ attr.``class`` "timeline-hint" ] [
                 text "Estimated trip structure with individual charging stops."
@@ -204,15 +199,13 @@ module Client =
                 on.change (fun el _ ->
                     let value = string el?value
                     selectedBrand.Value <- value
-                    selectedModelId.Value <- ""
-                )
+                    selectedModelId.Value <- "")
             ] [
                 option [ attr.value "" ] [ text "Select brand" ]
                 yield!
                     brands
                     |> List.map (fun brand ->
-                        option [ attr.value brand ] [ text brand ]
-                    )
+                        option [ attr.value brand ] [ text brand ])
             ]
         ]
 
@@ -231,12 +224,10 @@ module Client =
                         (
                             modelsForBrand brand
                             |> List.map (fun preset ->
-                                option [ attr.value preset.Id ] [ text preset.Model ]
-                            )
+                                option [ attr.value preset.Id ] [ text preset.Model ])
                         )
 
-                Doc.Concat options
-            )
+                Doc.Concat options)
 
         div [ attr.``class`` "field" ] [
             label [ attr.``class`` "label" ] [ text "Model" ]
@@ -247,8 +238,7 @@ module Client =
                     let value = string el?value
                     selectedModelId.Value <- value
                     applyPreset value
-                    calculate ()
-                )
+                    calculate ())
             ] [
                 Doc.BindView id modelOptionsDoc
             ]
@@ -284,7 +274,7 @@ module Client =
                 div [ attr.``class`` "button-row" ] [
                     button [
                         attr.``class`` "calculate-button"
-                        on.click (fun _ _ -> calculate())
+                        on.click (fun _ _ -> calculate ())
                     ] [
                         text "Calculate"
                     ]

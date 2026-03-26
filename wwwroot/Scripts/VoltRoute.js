@@ -94,8 +94,19 @@ function chargingTimeText(){
 }
 function chargingTimeline(detailsView){
   return Doc.Element("div", [Attr.Create("class", "timeline-card")], [Doc.Element("h3", [Attr.Create("class", "timeline-title")], [Doc.TextNode("Trip timeline")]), Doc.BindView((details) => {
-    const stopDocs=collect_1((stop) => ofArray([timelineSeparator(), chargeNode(stop)]), details);
-    const docs=append_1(ofArray([startNode()]), append_1(stopDocs, ofArray([timelineSeparator(), endNode()])));
+    function build(docs_1, remainingStops){
+      while(true)
+        {
+          if(remainingStops.$==1){
+            const tail_1=remainingStops.$1;
+            const stop=remainingStops.$0;
+            docs_1=append_1(docs_1, ofArray([timelineSeparator(), chargeNode(stop)]));
+            remainingStops=tail_1;
+          }
+          else return append_1(docs_1, ofArray([timelineSeparator(), endNode()]));
+        }
+    }
+    const docs=build(ofArray([startNode()]), details);
     return Doc.Element("div", [Attr.Create("class", "timeline-row")], docs);
   }, detailsView), Doc.Element("div", [Attr.Create("class", "timeline-hint")], [Doc.TextNode("Estimated trip structure with individual charging stops.")])]);
 }
@@ -148,25 +159,24 @@ function applyPreset(presetId){
     chargingPower().Set(String(preset.ChargingPowerKw));
   }
 }
-function startNode(){
-  return _c.startNode;
-}
 function timelineSeparator(){
   return _c.timelineSeparator;
+}
+function chargeNode(stop){
+  return Doc.Element("div", [Attr.Create("class", "timeline-node timeline-charge")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u21af")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode((((_1) =>(_2) => _1("Charge "+String(_2)))((x) => x))(stop.StopNumber))]), Doc.Element("div", [Attr.Create("class", "timeline-stop-meta")], [Doc.Element("div", [], [Doc.TextNode((((_1) =>(_2) => _1("~"+String(_2)+" min"))((x) => x))(stop.ChargeTimeMinutes))]), Doc.Element("div", [], [Doc.TextNode(((((_1) =>(_2) =>(_3) => _1(_2.toFixed(0)+"% \u2192 "+_3.toFixed(0)+"%"))((x) => x))(stop.ArrivalSocPercent))(stop.TargetSocPercent))])])]);
 }
 function endNode(){
   return _c.endNode;
 }
-function chargeNode(stop){
-  const minutes=toInt(Math.round(stop.ChargeTimeHours*60));
-  return Doc.Element("div", [Attr.Create("class", "timeline-node timeline-charge")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u26a1")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode((((_1) =>(_2) => _1("Charge "+String(_2)))((x) => x))(stop.StopNumber))]), Doc.Element("div", [Attr.Create("class", "timeline-stop-meta")], [Doc.Element("div", [], [Doc.TextNode((((_1) =>(_2) => _1("~"+String(_2)+" min"))((x) => x))(minutes))]), Doc.Element("div", [], [Doc.TextNode(((((_1) =>(_2) =>(_3) => _1(_2.toFixed(0)+"% \u2192 "+_3.toFixed(0)+"%"))((x) => x))(stop.ArrivalSocPercent))(stop.TargetSocPercent))])])]);
+function startNode(){
+  return _c.startNode;
+}
+function FailWith(msg){
+  throw new Error(msg);
 }
 function toInt(x){
   const u=toUInt(x);
   return u>2147483647?u-4294967296:u;
-}
-function FailWith(msg){
-  throw new Error(msg);
 }
 function toUInt(x){
   return(x<0?Math.ceil(x):Math.floor(x))>>>0;
@@ -213,7 +223,7 @@ function calculateRemainingEnergy(availableEnergy, energyNeeded){
   return Compare(a, b)===1?a:b;
 }
 function simulateChargingStops(input){
-  const targetSoc_1=clamp(20, 95, input.TargetSocPercent);
+  const userTargetSoc=clamp(20, 95, input.TargetSocPercent);
   const startEnergy=calculateAvailableEnergy(input.BatteryCapacity, input.StateOfChargePercent);
   const reserveEnergy=calculateAvailableEnergy(input.BatteryCapacity, 10);
   function loop(stopNumber, currentEnergy, remainingDistance, acc){
@@ -234,7 +244,8 @@ function simulateChargingStops(input){
             const arrivalSoc=calculateSocFromEnergy(input.BatteryCapacity, arrivalEnergy);
             const remainingAfterDrive=remainingDistance-maxLegDistance;
             const energyNeededForRemaining=calculateEnergyNeeded(remainingAfterDrive, input.ConsumptionPer100Km);
-            const fullTargetEnergy=calculateAvailableEnergy(input.BatteryCapacity, targetSoc_1);
+            const dynamicTargetSoc=chooseDynamicTargetSoc(userTargetSoc, input.DistanceKm, remainingAfterDrive);
+            const fullTargetEnergy=calculateAvailableEnergy(input.BatteryCapacity, dynamicTargetSoc);
             const b_2=energyNeededForRemaining+reserveEnergy;
             const nextTargetEnergy=Compare(fullTargetEnergy, b_2)===-1?fullTargetEnergy:b_2;
             const x=calculateSocFromEnergy(input.BatteryCapacity, nextTargetEnergy);
@@ -243,11 +254,14 @@ function simulateChargingStops(input){
             const b_3=nextTargetEnergy-arrivalEnergy;
             const chargedEnergy=Compare(a_2, b_3)===1?a_2:b_3;
             const chargeTime=estimateChargingTimeSegment(input.BatteryCapacity, input.ChargingPowerKw, arrivalSoc, nextTargetSoc);
-            const stop=New_3(stopNumber, arrivalSoc, nextTargetSoc, chargedEnergy, chargeTime, maxLegDistance);
-            stopNumber=stopNumber+1;
-            currentEnergy=nextTargetEnergy;
-            remainingDistance=remainingAfterDrive;
-            acc=FSharpList.Cons(stop, acc);
+            if(chargedEnergy<0.01||nextTargetSoc<=arrivalSoc+0.1)return rev(acc);
+            else {
+              const stop=New_3(stopNumber, arrivalSoc, nextTargetSoc, chargedEnergy, chargeTime, toInt(Math.round(chargeTime*60)), maxLegDistance);
+              stopNumber=stopNumber+1;
+              currentEnergy=nextTargetEnergy;
+              remainingDistance=remainingAfterDrive;
+              acc=FSharpList.Cons(stop, acc);
+            }
           }
         }
       }
@@ -294,6 +308,11 @@ function estimateChargingTimeSegment(batteryCapacity, chargingPowerKw, fromSoc, 
     }
     return loop(fromSoc, 0);
   }
+}
+function chooseDynamicTargetSoc(userTargetSoc, totalDistance, remainingAfterDrive){
+  const distanceRatio=totalDistance<=0?0:remainingAfterDrive/totalDistance;
+  const b=distanceRatio>0.6?80:distanceRatio>0.3?70:60;
+  return Compare(userTargetSoc, b)===-1?userTargetSoc:b;
 }
 function chargingPowerFactor(soc_1){
   return soc_1<20?0.85:soc_1<60?1:soc_1<80?0.65:0.3;
@@ -501,53 +520,6 @@ function sumBy(f, s){
   }
   return res;
 }
-function collect(f, s){
-  return concat(map(f, s));
-}
-function concat(ss){
-  return{GetEnumerator:() => {
-    const outerE=Get(ss);
-    function next(st){
-      while(true)
-        {
-          const m=st.s;
-          if(Equals(m, null)){
-            if(outerE.MoveNext()){
-              st.s=Get(outerE.Current);
-              st=st;
-            }
-            else {
-              outerE.Dispose();
-              return false;
-            }
-          }
-          else if(m.MoveNext()){
-            st.c=m.Current;
-            return true;
-          }
-          else {
-            st.Dispose();
-            st.s=null;
-            st=st;
-          }
-        }
-    }
-    return new T(null, null, next, (st) => {
-      const x=st.s;
-      if(!Equals(x, null))x.Dispose();
-      const x_1=outerE;
-      if(!Equals(x_1, null))x_1.Dispose();
-    });
-  }};
-}
-function map(f, s){
-  return{GetEnumerator:() => {
-    const en=Get(s);
-    return new T(null, null, (e) => en.MoveNext()&&(e.c=f(en.Current),true), () => {
-      en.Dispose();
-    });
-  }};
-}
 function head(s){
   const e=Get(s);
   try {
@@ -613,6 +585,17 @@ function fold(f, x, s){
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
 }
+function collect(f, s){
+  return concat(map(f, s));
+}
+function map(f, s){
+  return{GetEnumerator:() => {
+    const en=Get(s);
+    return new T(null, null, (e) => en.MoveNext()&&(e.c=f(en.Current),true), () => {
+      en.Dispose();
+    });
+  }};
+}
 function iter(p, s){
   const e=Get(s);
   try {
@@ -623,6 +606,42 @@ function iter(p, s){
     const _1=e;
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
+}
+function concat(ss){
+  return{GetEnumerator:() => {
+    const outerE=Get(ss);
+    function next(st){
+      while(true)
+        {
+          const m=st.s;
+          if(Equals(m, null)){
+            if(outerE.MoveNext()){
+              st.s=Get(outerE.Current);
+              st=st;
+            }
+            else {
+              outerE.Dispose();
+              return false;
+            }
+          }
+          else if(m.MoveNext()){
+            st.c=m.Current;
+            return true;
+          }
+          else {
+            st.Dispose();
+            st.s=null;
+            st=st;
+          }
+        }
+    }
+    return new T(null, null, next, (st) => {
+      const x=st.s;
+      if(!Equals(x, null))x.Dispose();
+      const x_1=outerE;
+      if(!Equals(x_1, null))x_1.Dispose();
+    });
+  }};
 }
 function init(n, f){
   return take(n, initInfinite(f));
@@ -727,9 +746,6 @@ function ofArray(arr){
   let r=FSharpList.Empty;
   for(let i=length_1(arr)-1, _1=0;i>=_1;i--)r=FSharpList.Cons(get(arr, i), r);
   return r;
-}
-function collect_1(f, l){
-  return ofSeq(collect(f, l));
 }
 function length(l){
   let r=l;
@@ -959,8 +975,8 @@ let _c=Lazy((_i) => class $StartupCode_Client {
     this.errorText=_c_2.Create_1("");
     this.chargingStopDetails=_c_2.Create_1(FSharpList.Empty);
     this.timelineSeparator=Doc.Element("div", [Attr.Create("class", "timeline-separator")], []);
-    this.startNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-start")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u25cf")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("Start")])]);
-    this.endNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-end")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\ud83c\udfc1")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("End")])]);
+    this.startNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-start")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u25ce")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("Start")])]);
+    this.endNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-end")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u2691")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("End")])]);
   }
 });
 function LoadLocalTemplates(baseName){
@@ -1252,13 +1268,14 @@ function PrepareSingleTemplate(baseName, name, el){
 function TextHoleRE(){
   return _c_3.TextHoleRE;
 }
-function New_3(StopNumber, ArrivalSocPercent, TargetSocPercent, ChargedEnergyKWh, ChargeTimeHours, DriveDistanceKm){
+function New_3(StopNumber, ArrivalSocPercent, TargetSocPercent, ChargedEnergyKWh, ChargeTimeHours, ChargeTimeMinutes, DriveDistanceKm){
   return{
     StopNumber:StopNumber, 
     ArrivalSocPercent:ArrivalSocPercent, 
     TargetSocPercent:TargetSocPercent, 
     ChargedEnergyKWh:ChargedEnergyKWh, 
     ChargeTimeHours:ChargeTimeHours, 
+    ChargeTimeMinutes:ChargeTimeMinutes, 
     DriveDistanceKm:DriveDistanceKm
   };
 }

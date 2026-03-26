@@ -23,6 +23,7 @@ module Calculations =
             TargetSocPercent : float
             ChargedEnergyKWh : float
             ChargeTimeHours : float
+            ChargeTimeMinutes : int
             DriveDistanceKm : float
         }
 
@@ -100,8 +101,20 @@ module Calculations =
 
             loop fromSoc 0.0
 
+    let chooseDynamicTargetSoc userTargetSoc totalDistance remainingAfterDrive =
+        let distanceRatio =
+            if totalDistance <= 0.0 then 0.0
+            else remainingAfterDrive / totalDistance
+
+        let heuristicTargetSoc =
+            if distanceRatio > 0.60 then 80.0
+            elif distanceRatio > 0.30 then 70.0
+            else 60.0
+
+        min userTargetSoc heuristicTargetSoc
+
     let simulateChargingStops (input: TripInput) =
-        let targetSoc = clamp 20.0 95.0 input.TargetSocPercent
+        let userTargetSoc = clamp 20.0 95.0 input.TargetSocPercent
 
         let startEnergy =
             calculateAvailableEnergy input.BatteryCapacity input.StateOfChargePercent
@@ -140,8 +153,11 @@ module Calculations =
                     let energyNeededForRemaining =
                         calculateEnergyNeeded remainingAfterDrive input.ConsumptionPer100Km
 
+                    let dynamicTargetSoc =
+                        chooseDynamicTargetSoc userTargetSoc input.DistanceKm remainingAfterDrive
+
                     let fullTargetEnergy =
-                        calculateAvailableEnergy input.BatteryCapacity targetSoc
+                        calculateAvailableEnergy input.BatteryCapacity dynamicTargetSoc
 
                     let energyNeededToFinishWithReserve =
                         energyNeededForRemaining + reserveEnergy
@@ -163,17 +179,21 @@ module Calculations =
                             arrivalSoc
                             nextTargetSoc
 
-                    let stop =
-                        {
-                            StopNumber = stopNumber
-                            ArrivalSocPercent = arrivalSoc
-                            TargetSocPercent = nextTargetSoc
-                            ChargedEnergyKWh = chargedEnergy
-                            ChargeTimeHours = chargeTime
-                            DriveDistanceKm = driveDistance
-                        }
+                    if chargedEnergy < 0.01 || nextTargetSoc <= arrivalSoc + 0.1 then
+                        List.rev acc
+                    else
+                        let stop =
+                            {
+                                StopNumber = stopNumber
+                                ArrivalSocPercent = arrivalSoc
+                                TargetSocPercent = nextTargetSoc
+                                ChargedEnergyKWh = chargedEnergy
+                                ChargeTimeHours = chargeTime
+                                ChargeTimeMinutes = int (System.Math.Round(chargeTime * 60.0))
+                                DriveDistanceKm = driveDistance
+                            }
 
-                    loop (stopNumber + 1) nextTargetEnergy remainingAfterDrive (stop :: acc)
+                        loop (stopNumber + 1) nextTargetEnergy remainingAfterDrive (stop :: acc)
 
         loop 1 startEnergy input.DistanceKm []
 
