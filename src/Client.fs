@@ -1,5 +1,6 @@
 namespace VoltRoute
 
+open System
 open WebSharper
 open WebSharper.JavaScript
 open WebSharper.UI
@@ -135,6 +136,52 @@ module Client =
             ]
         ]
 
+    let timelineNode className iconText labelText =
+        div [ attr.``class`` ("timeline-node " + className) ] [
+            div [ attr.``class`` "timeline-icon" ] [ text iconText ]
+            div [ attr.``class`` "timeline-label" ] [ text labelText ]
+        ]
+
+    let timelineSeparator =
+        div [ attr.``class`` "timeline-separator" ] []
+
+    let chargingTimeline stopsView =
+        div [ attr.``class`` "timeline-card" ] [
+            h3 [ attr.``class`` "timeline-title" ] [ text "Trip timeline" ]
+
+            Doc.BindView (fun stopsText ->
+                let stops =
+                    match Int32.TryParse (stopsText : string) with
+                    | true, v when v > 0 -> v
+                    | _ -> 0
+
+                let stopNodes =
+                    [ 1 .. stops ]
+                    |> List.collect (fun i ->
+                        [
+                            timelineSeparator
+                            timelineNode "timeline-charge" "⚡" (sprintf "Charge %d" i)
+                        ]
+                    )
+
+                let docs =
+                    [
+                        timelineNode "timeline-start" "●" "Start"
+                    ]
+                    @ stopNodes
+                    @ [
+                        timelineSeparator
+                        timelineNode "timeline-end" "🏁" "End"
+                    ]
+
+                div [ attr.``class`` "timeline-row" ] docs
+            ) stopsView
+
+            div [ attr.``class`` "timeline-hint" ] [
+                text "Visual overview of the estimated trip structure."
+            ]
+        ]
+
     let brandField () =
         div [ attr.``class`` "field" ] [
             label [ attr.``class`` "label" ] [ text "Brand" ]
@@ -200,15 +247,15 @@ module Client =
 
         div [ attr.``class`` "page" ] [
 
-            div [ attr.``class`` "card" ] [
-                div [ attr.``class`` "hero" ] [
-                    h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
+            div [ attr.``class`` "hero" ] [
+                h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
 
-                    p [ attr.``class`` "subtitle" ] [
+                p [ attr.``class`` "subtitle" ] [
                     text "Estimate EV energy use, range, charging strategy, charging stops, and trip cost."
-                    ]
                 ]
+            ]
 
+            div [ attr.``class`` "card" ] [
                 div [ attr.``class`` "grid" ] [
                     brandField ()
                     modelField ()
@@ -242,6 +289,8 @@ module Client =
                     chargingStopsHighlight chargingStopsText.View
                     chargingTimeHighlight chargingTimeText.View
                 ]
+
+                chargingTimeline chargingStopsText.View
 
                 resultRow "Available energy" availableEnergyText.View
                 resultRow "Available range" availableRangeText.View

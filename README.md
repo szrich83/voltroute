@@ -1,14 +1,11 @@
 # VoltRoute – EV Trip Planner
 
-# VoltRoute – EV Trip Planner
-
 ![.NET](https://img.shields.io/badge/.NET-10.0-blue)
 ![F#](https://img.shields.io/badge/language-F%23-blueviolet)
 ![WebSharper](https://img.shields.io/badge/WebSharper-UI-orange)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![GitHub repo size](https://img.shields.io/github/repo-size/szrich83/VoltRoute)
 ![GitHub last commit](https://img.shields.io/github/last-commit/szrich83/VoltRoute)
-
 
 ![VoltRoute Preview](docs/main.png)
 
@@ -41,6 +38,7 @@ Unlike basic calculators, VoltRoute simulates **real-world EV charging behavior*
 ## UI Overview
 
 ### Main Input Panel
+
 - Battery capacity
 - Consumption
 - Distance
@@ -50,6 +48,7 @@ Unlike basic calculators, VoltRoute simulates **real-world EV charging behavior*
 - Target charge strategy
 
 ### Results
+
 - ⚡ Charging stops (highlighted)
 - ⏱ Charging time (highlighted)
 - Available range
@@ -64,11 +63,11 @@ Unlike basic calculators, VoltRoute simulates **real-world EV charging behavior*
 ### Charging Curve (simplified model)
 
 | SOC range | Charging speed |
-|----------|---------------|
-| 0–20%    | 85% power     |
-| 20–60%   | 100% power    |
-| 60–80%   | 65% power     |
-| 80%+     | 30% power     |
+| --------- | -------------- |
+| 0–20%     | 85% power      |
+| 20–60%    | 100% power     |
+| 60–80%    | 65% power      |
+| 80%+      | 30% power      |
 
 Charging is simulated in small SOC steps for realism.
 
@@ -78,8 +77,8 @@ Charging is simulated in small SOC steps for realism.
 
 User-defined:
 
-- 60% → faster stops, more stops  
-- 80% → slower stops, fewer stops  
+- 60% → faster stops, more stops
+- 80% → slower stops, fewer stops
 
 ---
 
@@ -121,9 +120,11 @@ VoltRoute/
 ## Screenshots
 
 ### Main UI
+
 ![Main UI](docs/main.png)
 
 ### Results Panel
+
 ![Results](docs/results.png)
 
 ---
