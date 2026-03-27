@@ -21,6 +21,7 @@ module Client =
     let soc = Var.Create "80"
     let chargingPower = Var.Create "50"
     let targetSoc = Var.Create "80"
+    let chargerInterval = Var.Create "120"
 
     let availableEnergyText = Var.Create "-"
     let availableRangeText = Var.Create "-"
@@ -34,6 +35,7 @@ module Client =
     let chargingStopsText = Var.Create "-"
     let errorText = Var.Create ""
     let chargingStopDetails = Var.Create<List<ChargingStop>>([])
+    let socChartPoints = Var.Create<List<float * float>>([])
 
     let applyPreset presetId =
         match tryFindPresetById presetId with
@@ -43,6 +45,52 @@ module Client =
             chargingPower.Value <- string preset.ChargingPowerKw
         | None ->
             ()
+
+    let buildSocChartPoints (input: TripInput) (result: TripResult) =
+        let startSoc = input.StateOfChargePercent
+        let totalDistance = input.DistanceKm
+        let batteryCapacity = input.BatteryCapacity
+        let consumptionPer100Km = input.ConsumptionPer100Km
+
+        if List.isEmpty result.ChargingStopDetails then
+            [
+                (0.0, startSoc)
+                (totalDistance, result.RemainingSocPercent)
+            ]
+        else
+            let mutable currentDistance = 0.0
+            let mutable points : List<float * float> = [ (0.0, startSoc) ]
+
+            for stop in result.ChargingStopDetails do
+                currentDistance <- currentDistance + stop.DriveDistanceKm
+                points <- points @ [ (currentDistance, stop.ArrivalSocPercent) ]
+                points <- points @ [ (currentDistance, stop.TargetSocPercent) ]
+
+            let drivenUntilLastCharge =
+                result.ChargingStopDetails
+                |> List.sumBy (fun s -> s.DriveDistanceKm)
+
+            let remainingFinalDistance =
+                max 0.0 (totalDistance - drivenUntilLastCharge)
+
+            let finalSoc =
+                match List.tryLast result.ChargingStopDetails with
+                | None ->
+                    result.RemainingSocPercent
+                | Some lastStop ->
+                    let startFinalEnergy =
+                        batteryCapacity * (lastStop.TargetSocPercent / 100.0)
+
+                    let finalLegEnergyNeeded =
+                        (remainingFinalDistance / 100.0) * consumptionPer100Km
+
+                    let finalEnergy =
+                        max 0.0 (startFinalEnergy - finalLegEnergyNeeded)
+
+                    if batteryCapacity <= 0.0 then 0.0
+                    else (finalEnergy / batteryCapacity) * 100.0
+
+            points @ [ (totalDistance, finalSoc) ]
 
     let calculate () =
         try
@@ -57,6 +105,7 @@ module Client =
                     StateOfChargePercent = float soc.Value
                     ChargingPowerKw = float chargingPower.Value
                     TargetSocPercent = float targetSoc.Value
+                    AverageChargerIntervalKm = float chargerInterval.Value
                 }
 
             let result = calculateTrip input
@@ -70,6 +119,7 @@ module Client =
             chargingTimeText.Value <- sprintf "%.2f h" result.ChargingTimeHours
             chargingStopsText.Value <- string result.ChargingStops
             chargingStopDetails.Value <- result.ChargingStopDetails
+            socChartPoints.Value <- buildSocChartPoints input result
 
             if result.NeedsCharging then
                 remainingEnergyText.Value <- "N/A"
@@ -81,6 +131,7 @@ module Client =
         | _ ->
             errorText.Value <- "Invalid input. Please enter valid numeric values."
             chargingStopDetails.Value <- []
+            socChartPoints.Value <- []
 
     let field labelText valueVar =
         div [ attr.``class`` "field" ] [
@@ -97,7 +148,6 @@ module Client =
     let statusRow labelText valueView =
         div [ attr.``class`` "result-row" ] [
             span [ attr.``class`` "result-label" ] [ text labelText ]
-
             span [ attr.``class`` "result-value" ] [
                 Doc.BindView
                     (fun v ->
@@ -121,7 +171,6 @@ module Client =
                 span [ attr.``class`` "highlight-icon" ] [ text "⚡" ]
                 span [ attr.``class`` "highlight-label" ] [ text "Estimated charging stops" ]
             ]
-
             span [ attr.``class`` "highlight-value" ] [
                 textView valueView
             ]
@@ -133,7 +182,6 @@ module Client =
                 span [ attr.``class`` "highlight-icon" ] [ text "⏱" ]
                 span [ attr.``class`` "highlight-label" ] [ text "Estimated charging time" ]
             ]
-
             span [ attr.``class`` "highlight-value" ] [
                 textView valueView
             ]
@@ -160,6 +208,7 @@ module Client =
             div [ attr.``class`` "timeline-label" ] [ text (sprintf "Charge %d" stop.StopNumber) ]
             div [ attr.``class`` "timeline-stop-meta" ] [
                 div [] [ text (sprintf "~%d min" stop.ChargeTimeMinutes) ]
+                div [] [ text (sprintf "%.0f km" stop.DriveDistanceKm) ]
                 div [] [
                     text (sprintf "%.0f%% → %.0f%%" stop.ArrivalSocPercent stop.TargetSocPercent)
                 ]
@@ -186,8 +235,124 @@ module Client =
                 detailsView
 
             div [ attr.``class`` "timeline-hint" ] [
-                text "Estimated trip structure with individual charging stops."
+                text "Stops are chosen from reachable chargers based on the configured charger spacing."
             ]
+        ]
+
+    let socChart pointsView =
+        let chartWidth = 860.0
+        let chartHeight = 320.0
+        let padLeft = 48.0
+        let padRight = 16.0
+        let padTop = 16.0
+        let padBottom = 34.0
+        let plotWidth = chartWidth - padLeft - padRight
+        let plotHeight = chartHeight - padTop - padBottom
+
+        let gridSocValues = [ 0.0; 25.0; 50.0; 75.0; 100.0 ]
+
+        div [ attr.``class`` "card soc-card" ] [
+            h2 [ attr.``class`` "results-title" ] [ text "SOC graph" ]
+
+            Doc.BindView
+                (fun points ->
+                    if List.isEmpty points then
+                        div [] [ text "No chart data available." ]
+                    else
+                        let maxDistance =
+                            points
+                            |> List.map fst
+                            |> List.max
+                            |> max 1.0
+
+                        let scaleX distanceKm =
+                            padLeft + (distanceKm / maxDistance) * plotWidth
+
+                        let scaleY socPercent =
+                            padTop + ((100.0 - socPercent) / 100.0) * plotHeight
+
+                        let lineDocs =
+                            points
+                            |> List.pairwise
+                            |> List.map (fun ((x1, y1), (x2, y2)) ->
+                                let px1 = scaleX x1
+                                let py1 = scaleY y1
+                                let px2 = scaleX x2
+                                let py2 = scaleY y2
+
+                                let dx = px2 - px1
+                                let dy = py2 - py1
+                                let length = sqrt (dx * dx + dy * dy)
+                                let angle = atan2 dy dx * 180.0 / System.Math.PI
+
+                                div [
+                                    attr.``class`` "soc-line"
+                                    attr.style (
+                                        sprintf
+                                            "left: %.2fpx; top: %.2fpx; width: %.2fpx; transform: rotate(%.2fdeg);"
+                                            px1 py1 length angle
+                                    )
+                                ] []
+                            )
+
+                        let pointDocs =
+                            points
+                            |> List.map (fun (distanceKm, socPercent) ->
+                                let px = scaleX distanceKm
+                                let py = scaleY socPercent
+
+                                div [
+                                    attr.``class`` "soc-point"
+                                    attr.style (
+                                        sprintf
+                                            "left: %.2fpx; top: %.2fpx;"
+                                            px py
+                                    )
+                                ] []
+                            )
+
+                        let yGridDocs =
+                            gridSocValues
+                            |> List.collect (fun socValue ->
+                                let py = scaleY socValue
+
+                                [
+                                    div [
+                                        attr.``class`` "soc-grid-line"
+                                        attr.style (sprintf "top: %.2fpx;" py)
+                                    ] []
+
+                                    div [
+                                        attr.``class`` "soc-grid-label"
+                                        attr.style (sprintf "top: %.2fpx;" py)
+                                    ] [
+                                        text (sprintf "%.0f%%" socValue)
+                                    ]
+                                ])
+
+                        let xLabelDocs =
+                            [ 0.0; maxDistance / 2.0; maxDistance ]
+                            |> List.map (fun km ->
+                                let px = scaleX km
+                                div [
+                                    attr.``class`` "soc-x-label"
+                                    attr.style (sprintf "left: %.2fpx;" px)
+                                ] [
+                                    text (sprintf "%.0f km" km)
+                                ])
+
+                        div [] [
+                            div [ attr.``class`` "soc-chart-shell" ] [
+                                div [ attr.``class`` "soc-plot" ] (
+                                    yGridDocs @ lineDocs @ pointDocs @ xLabelDocs
+                                )
+                            ]
+
+                            div [ attr.``class`` "soc-chart-legend" ] [
+                                text "Driving lowers SOC; reachable chargers based on charger spacing create the charging jumps."
+                            ]
+                        ])
+                pointsView
         ]
 
     let brandField () =
@@ -252,7 +417,6 @@ module Client =
 
             div [ attr.``class`` "hero" ] [
                 h1 [ attr.``class`` "title" ] [ text "VoltRoute – EV Trip Planner" ]
-
                 p [ attr.``class`` "subtitle" ] [
                     text "Estimate EV energy use, range, charging strategy, charging stops, and trip cost."
                 ]
@@ -269,6 +433,7 @@ module Client =
                     field "State of charge (%)" soc
                     field "Charging power (kW)" chargingPower
                     field "Target charge (%)" targetSoc
+                    field "Charger spacing (km)" chargerInterval
                 ]
 
                 div [ attr.``class`` "button-row" ] [
@@ -304,5 +469,7 @@ module Client =
                 resultRow "Remaining energy" remainingEnergyText.View
                 resultRow "Remaining SOC" remainingSocText.View
             ]
+
+            socChart socChartPoints.View
         ]
         |> Doc.RunById "main"

@@ -14,6 +14,7 @@ module Calculations =
             StateOfChargePercent : float
             ChargingPowerKw : float
             TargetSocPercent : float
+            AverageChargerIntervalKm : float
         }
 
     type ChargingStop =
@@ -113,6 +114,30 @@ module Calculations =
 
         min userTargetSoc heuristicTargetSoc
 
+    /// Returns the latest reachable charger position assuming chargers are available
+    /// every `chargerSpacingKm`. The charger spacing is availability, not a mandatory stop distance.
+    let chooseChargerStopDistance maxLegDistance chargerSpacingKm remainingDistance =
+        let spacing =
+            chargerSpacingKm
+            |> max 20.0
+
+        let latestUsefulDistance =
+            min maxLegDistance remainingDistance
+
+        let reachableChargerIndex =
+            floor (latestUsefulDistance / spacing)
+
+        if reachableChargerIndex < 1.0 then
+            latestUsefulDistance
+        else
+            let chargerDistance = reachableChargerIndex * spacing
+
+            // If chargerDistance is too tiny due to some odd edge case, just use max safe range.
+            if chargerDistance < 1.0 then
+                latestUsefulDistance
+            else
+                chargerDistance
+
     let simulateChargingStops (input: TripInput) =
         let userTargetSoc = clamp 20.0 95.0 input.TargetSocPercent
 
@@ -136,7 +161,11 @@ module Calculations =
                 if remainingDistance <= maxLegDistance then
                     List.rev acc
                 else
-                    let driveDistance = maxLegDistance
+                    let driveDistance =
+                        chooseChargerStopDistance
+                            maxLegDistance
+                            input.AverageChargerIntervalKm
+                            remainingDistance
 
                     let energyUsedThisLeg =
                         calculateEnergyNeeded driveDistance input.ConsumptionPer100Km
@@ -225,7 +254,11 @@ module Calculations =
             if energyNeeded <= availableEnergy then
                 []
             else
-                simulateChargingStops { input with TargetSocPercent = effectiveTargetSoc }
+                simulateChargingStops {
+                    input with
+                        TargetSocPercent = effectiveTargetSoc
+                        AverageChargerIntervalKm = max 20.0 input.AverageChargerIntervalKm
+                }
 
         let chargingStops =
             List.length stopDetails

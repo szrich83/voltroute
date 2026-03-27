@@ -6,14 +6,15 @@ function isIDisposable(x){
 }
 function Main(){
   calculate();
-  const _1=Doc.Element("div", [Attr.Create("class", "page")], [Doc.Element("div", [Attr.Create("class", "hero")], [Doc.Element("h1", [Attr.Create("class", "title")], [Doc.TextNode("VoltRoute \u2013 EV Trip Planner")]), Doc.Element("p", [Attr.Create("class", "subtitle")], [Doc.TextNode("Estimate EV energy use, range, charging strategy, charging stops, and trip cost.")])]), Doc.Element("div", [Attr.Create("class", "card")], [Doc.Element("div", [Attr.Create("class", "grid")], [brandField(), modelField(), field("Battery capacity (kWh)", battery()), field("Consumption (kWh / 100 km)", consumption()), field("Trip distance (km)", distance()), field("Electricity price (\u20ac/kWh)", price()), field("State of charge (%)", soc()), field("Charging power (kW)", chargingPower()), field("Target charge (%)", targetSoc())]), Doc.Element("div", [Attr.Create("class", "button-row")], [Doc.Element("button", [Attr.Create("class", "calculate-button"), Attr.HandlerImpl("click", () =>() => calculate())], [Doc.TextNode("Calculate")])]), Doc.Element("div", [Attr.Create("class", "error-text")], [Doc.TextView(errorText().View)])]), Doc.Element("div", [Attr.Create("class", "card results-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("Results")]), Doc.Element("div", [Attr.Create("class", "highlight-stack")], [chargingStopsHighlight(chargingStopsText().View), chargingTimeHighlight(chargingTimeText().View)]), chargingTimeline(chargingStopDetails().View), resultRow("Available energy", availableEnergyText().View), resultRow("Available range", availableRangeText().View), resultRow("Energy needed", energyNeededText().View), resultRow("Trip cost", tripCostText().View), statusRow("Needs charging", needsChargingText().View), resultRow("Charging needed", chargingNeededText().View), resultRow("Remaining energy", remainingEnergyText().View), resultRow("Remaining SOC", remainingSocText().View)])]);
+  const _1=Doc.Element("div", [Attr.Create("class", "page")], [Doc.Element("div", [Attr.Create("class", "hero")], [Doc.Element("h1", [Attr.Create("class", "title")], [Doc.TextNode("VoltRoute \u2013 EV Trip Planner")]), Doc.Element("p", [Attr.Create("class", "subtitle")], [Doc.TextNode("Estimate EV energy use, range, charging strategy, charging stops, and trip cost.")])]), Doc.Element("div", [Attr.Create("class", "card")], [Doc.Element("div", [Attr.Create("class", "grid")], [brandField(), modelField(), field("Battery capacity (kWh)", battery()), field("Consumption (kWh / 100 km)", consumption()), field("Trip distance (km)", distance()), field("Electricity price (\u20ac/kWh)", price()), field("State of charge (%)", soc()), field("Charging power (kW)", chargingPower()), field("Target charge (%)", targetSoc()), field("Charger spacing (km)", chargerInterval())]), Doc.Element("div", [Attr.Create("class", "button-row")], [Doc.Element("button", [Attr.Create("class", "calculate-button"), Attr.HandlerImpl("click", () =>() => calculate())], [Doc.TextNode("Calculate")])]), Doc.Element("div", [Attr.Create("class", "error-text")], [Doc.TextView(errorText().View)])]), Doc.Element("div", [Attr.Create("class", "card results-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("Results")]), Doc.Element("div", [Attr.Create("class", "highlight-stack")], [chargingStopsHighlight(chargingStopsText().View), chargingTimeHighlight(chargingTimeText().View)]), chargingTimeline(chargingStopDetails().View), resultRow("Available energy", availableEnergyText().View), resultRow("Available range", availableRangeText().View), resultRow("Energy needed", energyNeededText().View), resultRow("Trip cost", tripCostText().View), statusRow("Needs charging", needsChargingText().View), resultRow("Charging needed", chargingNeededText().View), resultRow("Remaining energy", remainingEnergyText().View), resultRow("Remaining SOC", remainingSocText().View)]), socChart(socChartPoints().View)]);
   LoadLocalTemplates("");
   Doc.RunById("main", _1);
 }
 function calculate(){
   try {
     errorText().Set("");
-    const result=calculateTrip(New_1(Number(battery().Get()), Number(consumption().Get()), Number(distance().Get()), Number(price().Get()), Number(soc().Get()), Number(chargingPower().Get()), Number(targetSoc().Get())));
+    const input=New(Number(battery().Get()), Number(consumption().Get()), Number(distance().Get()), Number(price().Get()), Number(soc().Get()), Number(chargingPower().Get()), Number(targetSoc().Get()), Number(chargerInterval().Get()));
+    const result=calculateTrip(input);
     availableEnergyText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" kWh"))((x) => x))(result.AvailableEnergyKWh));
     availableRangeText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" km"))((x) => x))(result.AvailableRangeKm));
     energyNeededText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" kWh"))((x) => x))(result.EnergyNeededKWh));
@@ -23,6 +24,7 @@ function calculate(){
     chargingTimeText().Set((((_1) =>(_2) => _1(_2.toFixed(2)+" h"))((x) => x))(result.ChargingTimeHours));
     chargingStopsText().Set(String(result.ChargingStops));
     chargingStopDetails().Set(result.ChargingStopDetails);
+    socChartPoints().Set(buildSocChartPoints(input, result));
     if(result.NeedsCharging){
       remainingEnergyText().Set("N/A");
       remainingSocText().Set("N/A");
@@ -35,6 +37,7 @@ function calculate(){
   catch(m){
     errorText().Set("Invalid input. Please enter valid numeric values.");
     chargingStopDetails().Set(FSharpList.Empty);
+    socChartPoints().Set(FSharpList.Empty);
   }
 }
 function brandField(){
@@ -77,6 +80,9 @@ function chargingPower(){
 function targetSoc(){
   return _c.targetSoc;
 }
+function chargerInterval(){
+  return _c.chargerInterval;
+}
 function errorText(){
   return _c.errorText;
 }
@@ -108,7 +114,7 @@ function chargingTimeline(detailsView){
     }
     const docs=build(ofArray([startNode()]), details);
     return Doc.Element("div", [Attr.Create("class", "timeline-row")], docs);
-  }, detailsView), Doc.Element("div", [Attr.Create("class", "timeline-hint")], [Doc.TextNode("Estimated trip structure with individual charging stops.")])]);
+  }, detailsView), Doc.Element("div", [Attr.Create("class", "timeline-hint")], [Doc.TextNode("Stops are chosen from reachable chargers based on the configured charger spacing.")])]);
 }
 function chargingStopDetails(){
   return _c.chargingStopDetails;
@@ -143,6 +149,95 @@ function remainingEnergyText(){
 function remainingSocText(){
   return _c.remainingSocText;
 }
+function socChart(pointsView){
+  const padLeft=48;
+  const padTop=16;
+  const plotWidth=860-padLeft-16;
+  const plotHeight=320-padTop-34;
+  const gridSocValues=ofArray([0, 25, 50, 75, 100]);
+  return Doc.Element("div", [Attr.Create("class", "card soc-card")], [Doc.Element("h2", [Attr.Create("class", "results-title")], [Doc.TextNode("SOC graph")]), Doc.BindView((points) => {
+    if(points.$==0)return Doc.Element("div", [], [Doc.TextNode("No chart data available.")]);
+    else {
+      const e=max_1(map_1((t) => t[0], points));
+      const a=1;
+      const maxDistance=Compare(a, e)===1?a:e;
+      const scaleX=(distanceKm) => padLeft+distanceKm/maxDistance*plotWidth;
+      const scaleY=(socPercent) => padTop+(100-socPercent)/100*plotHeight;
+      const lineDocs=map_1((_1) => {
+        const a_1=_1[0];
+        const a_2=_1[1];
+        const px1=scaleX(a_1[0]);
+        const py1=scaleY(a_1[1]);
+        const px2=scaleX(a_2[0]);
+        const py2=scaleY(a_2[1]);
+        const dx=px2-px1;
+        const dy=py2-py1;
+        const length_2=Math.sqrt(dx*dx+dy*dy);
+        const angle=Math.atan2(dy, dx)*180/3.141592653589793;
+        return Doc.Element("div", [Attr.Create("class", "soc-line"), Attr.Create("style", ((((((_2) =>(_3) =>(_4) =>(_5) =>(_6) => _2("left: "+_3.toFixed(2)+"px; top: "+_4.toFixed(2)+"px; width: "+_5.toFixed(2)+"px; transform: rotate("+_6.toFixed(2)+"deg);"))((x) => x))(px1))(py1))(length_2))(angle))], []);
+      }, pairwise_1(points));
+      const pointDocs=map_1((_1) => {
+        const px=scaleX(_1[0]);
+        const py=scaleY(_1[1]);
+        return Doc.Element("div", [Attr.Create("class", "soc-point"), Attr.Create("style", ((((_2) =>(_3) =>(_4) => _2("left: "+_3.toFixed(2)+"px; top: "+_4.toFixed(2)+"px;"))((x) => x))(px))(py))], []);
+      }, points);
+      const yGridDocs=collect_1((socValue) => {
+        const py=scaleY(socValue);
+        return ofArray([Doc.Element("div", [Attr.Create("class", "soc-grid-line"), Attr.Create("style", (((_1) =>(_2) => _1("top: "+_2.toFixed(2)+"px;"))((x) => x))(py))], []), Doc.Element("div", [Attr.Create("class", "soc-grid-label"), Attr.Create("style", (((_1) =>(_2) => _1("top: "+_2.toFixed(2)+"px;"))((x) => x))(py))], [Doc.TextNode((((_1) =>(_2) => _1(_2.toFixed(0)+"%"))((x) => x))(socValue))])]);
+      }, gridSocValues);
+      const xLabelDocs=map_1((km) => {
+        const px=scaleX(km);
+        return Doc.Element("div", [Attr.Create("class", "soc-x-label"), Attr.Create("style", (((_1) =>(_2) => _1("left: "+_2.toFixed(2)+"px;"))((x) => x))(px))], [Doc.TextNode((((_1) =>(_2) => _1(_2.toFixed(0)+" km"))((x) => x))(km))]);
+      }, ofArray([0, maxDistance/2, maxDistance]));
+      return Doc.Element("div", [], [Doc.Element("div", [Attr.Create("class", "soc-chart-shell")], [Doc.Element("div", [Attr.Create("class", "soc-plot")], append_1(yGridDocs, append_1(lineDocs, append_1(pointDocs, xLabelDocs))))]), Doc.Element("div", [Attr.Create("class", "soc-chart-legend")], [Doc.TextNode("Driving lowers SOC; reachable chargers based on charger spacing create the charging jumps.")])]);
+    }
+  }, pointsView)]);
+}
+function socChartPoints(){
+  return _c.socChartPoints;
+}
+function buildSocChartPoints(input, result){
+  let currentDistance;
+  let points;
+  let _1;
+  const startSoc=input.StateOfChargePercent;
+  const totalDistance=input.DistanceKm;
+  const batteryCapacity=input.BatteryCapacity;
+  if(result.ChargingStopDetails.$==0)return ofArray([[0, startSoc], [totalDistance, result.RemainingSocPercent]]);
+  else {
+    currentDistance=0;
+    points=ofArray([[0, startSoc]]);
+    const e=Get(result.ChargingStopDetails);
+    try {
+      while(e.MoveNext())
+        {
+          const stop=e.Current;
+          currentDistance=currentDistance+stop.DriveDistanceKm;
+          points=append_1(points, ofArray([[currentDistance, stop.ArrivalSocPercent]]));
+          points=append_1(points, ofArray([[currentDistance, stop.TargetSocPercent]]));
+        }
+    }
+    finally {
+      const _2=e;
+      if(typeof _2=="object"&&isIDisposable(_2))e.Dispose();
+    }
+    const a=0;
+    const b=totalDistance-sumBy((s) => s.DriveDistanceKm, result.ChargingStopDetails);
+    const remainingFinalDistance=Compare(a, b)===1?a:b;
+    let _3=points;
+    const m=tryLast(result.ChargingStopDetails);
+    if(m!=null&&m.$==1){
+      const a_1=0;
+      const b_1=batteryCapacity*(m.$0.TargetSocPercent/100)-remainingFinalDistance/100*input.ConsumptionPer100Km;
+      const finalEnergy=Compare(a_1, b_1)===1?a_1:b_1;
+      _1=batteryCapacity<=0?0:finalEnergy/batteryCapacity*100;
+    }
+    else _1=result.RemainingSocPercent;
+    let _4=[[totalDistance, _1]];
+    let _5=ofArray(_4);
+    return append_1(_3, _5);
+  }
+}
 function selectedBrand(){
   return _c.selectedBrand;
 }
@@ -163,7 +258,7 @@ function timelineSeparator(){
   return _c.timelineSeparator;
 }
 function chargeNode(stop){
-  return Doc.Element("div", [Attr.Create("class", "timeline-node timeline-charge")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u21af")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode((((_1) =>(_2) => _1("Charge "+String(_2)))((x) => x))(stop.StopNumber))]), Doc.Element("div", [Attr.Create("class", "timeline-stop-meta")], [Doc.Element("div", [], [Doc.TextNode((((_1) =>(_2) => _1("~"+String(_2)+" min"))((x) => x))(stop.ChargeTimeMinutes))]), Doc.Element("div", [], [Doc.TextNode(((((_1) =>(_2) =>(_3) => _1(_2.toFixed(0)+"% \u2192 "+_3.toFixed(0)+"%"))((x) => x))(stop.ArrivalSocPercent))(stop.TargetSocPercent))])])]);
+  return Doc.Element("div", [Attr.Create("class", "timeline-node timeline-charge")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u21af")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode((((_1) =>(_2) => _1("Charge "+String(_2)))((x) => x))(stop.StopNumber))]), Doc.Element("div", [Attr.Create("class", "timeline-stop-meta")], [Doc.Element("div", [], [Doc.TextNode((((_1) =>(_2) => _1("~"+String(_2)+" min"))((x) => x))(stop.ChargeTimeMinutes))]), Doc.Element("div", [], [Doc.TextNode((((_1) =>(_2) => _1(_2.toFixed(0)+" km"))((x) => x))(stop.DriveDistanceKm))]), Doc.Element("div", [], [Doc.TextNode(((((_1) =>(_2) =>(_3) => _1(_2.toFixed(0)+"% \u2192 "+_3.toFixed(0)+"%"))((x) => x))(stop.ArrivalSocPercent))(stop.TargetSocPercent))])])]);
 }
 function endNode(){
   return _c.endNode;
@@ -184,8 +279,8 @@ function toUInt(x){
 function KeyValue(kvp){
   return[kvp.K, kvp.V];
 }
-function range(min, max_1){
-  const count=1+max_1-min;
+function range(min, max_2){
+  const count=1+max_2-min;
   return count<=0?[]:init(count, (x) => x+min);
 }
 class Object_1 {
@@ -198,7 +293,20 @@ class Object_1 {
 }
 class attr extends Object_1 { }
 class Var extends Object_1 { }
+function New(BatteryCapacity, ConsumptionPer100Km, DistanceKm, ElectricityPrice, StateOfChargePercent, ChargingPowerKw, TargetSocPercent, AverageChargerIntervalKm){
+  return{
+    BatteryCapacity:BatteryCapacity, 
+    ConsumptionPer100Km:ConsumptionPer100Km, 
+    DistanceKm:DistanceKm, 
+    ElectricityPrice:ElectricityPrice, 
+    StateOfChargePercent:StateOfChargePercent, 
+    ChargingPowerKw:ChargingPowerKw, 
+    TargetSocPercent:TargetSocPercent, 
+    AverageChargerIntervalKm:AverageChargerIntervalKm
+  };
+}
 function calculateTrip(input){
+  let stopDetails;
   const effectiveTargetSoc=clamp(20, 95, input.TargetSocPercent);
   const availableEnergy=calculateAvailableEnergy(input.BatteryCapacity, input.StateOfChargePercent);
   const availableRange=calculateAvailableRange(availableEnergy, input.ConsumptionPer100Km);
@@ -207,9 +315,16 @@ function calculateTrip(input){
   const chargingNeeded=calculateChargingNeeded(energyNeeded, availableEnergy);
   const remainingEnergy=calculateRemainingEnergy(availableEnergy, energyNeeded);
   const remainingSoc=calculateRemainingSoc(remainingEnergy, input.BatteryCapacity);
-  const stopDetails=energyNeeded<=availableEnergy?FSharpList.Empty:simulateChargingStops(New_1(input.BatteryCapacity, input.ConsumptionPer100Km, input.DistanceKm, input.ElectricityPrice, input.StateOfChargePercent, input.ChargingPowerKw, effectiveTargetSoc));
+  if(energyNeeded<=availableEnergy)stopDetails=FSharpList.Empty;
+  else {
+    const a=20;
+    const b=input.AverageChargerIntervalKm;
+    let _1=Compare(a, b)===1?a:b;
+    let _2=New(input.BatteryCapacity, input.ConsumptionPer100Km, input.DistanceKm, input.ElectricityPrice, input.StateOfChargePercent, input.ChargingPowerKw, effectiveTargetSoc, _1);
+    stopDetails=simulateChargingStops(_2);
+  }
   const chargingStops=length(stopDetails);
-  return New(availableEnergy, availableRange, energyNeeded, tripCost, energyNeeded>availableEnergy, chargingNeeded, sumBy((s) => s.ChargeTimeHours, stopDetails), remainingEnergy, remainingSoc, chargingStops, stopDetails);
+  return New_1(availableEnergy, availableRange, energyNeeded, tripCost, energyNeeded>availableEnergy, chargingNeeded, sumBy((s) => s.ChargeTimeHours, stopDetails), remainingEnergy, remainingSoc, chargingStops, stopDetails);
 }
 function calculateAvailableEnergy(batteryCapacity, socPercent){
   return batteryCapacity*(socPercent/100);
@@ -237,12 +352,13 @@ function simulateChargingStops(input){
           const maxLegDistance=calculateAvailableRange(usableEnergyThisLeg, input.ConsumptionPer100Km);
           if(remainingDistance<=maxLegDistance)return rev(acc);
           else {
-            const energyUsedThisLeg=calculateEnergyNeeded(maxLegDistance, input.ConsumptionPer100Km);
+            const driveDistance=chooseChargerStopDistance(maxLegDistance, input.AverageChargerIntervalKm, remainingDistance);
+            const energyUsedThisLeg=calculateEnergyNeeded(driveDistance, input.ConsumptionPer100Km);
             const a_1=0;
             const b_1=currentEnergy-energyUsedThisLeg;
             const arrivalEnergy=Compare(a_1, b_1)===1?a_1:b_1;
             const arrivalSoc=calculateSocFromEnergy(input.BatteryCapacity, arrivalEnergy);
-            const remainingAfterDrive=remainingDistance-maxLegDistance;
+            const remainingAfterDrive=remainingDistance-driveDistance;
             const energyNeededForRemaining=calculateEnergyNeeded(remainingAfterDrive, input.ConsumptionPer100Km);
             const dynamicTargetSoc=chooseDynamicTargetSoc(userTargetSoc, input.DistanceKm, remainingAfterDrive);
             const fullTargetEnergy=calculateAvailableEnergy(input.BatteryCapacity, dynamicTargetSoc);
@@ -256,7 +372,7 @@ function simulateChargingStops(input){
             const chargeTime=estimateChargingTimeSegment(input.BatteryCapacity, input.ChargingPowerKw, arrivalSoc, nextTargetSoc);
             if(chargedEnergy<0.01||nextTargetSoc<=arrivalSoc+0.1)return rev(acc);
             else {
-              const stop=New_3(stopNumber, arrivalSoc, nextTargetSoc, chargedEnergy, chargeTime, toInt(Math.round(chargeTime*60)), maxLegDistance);
+              const stop=New_3(stopNumber, arrivalSoc, nextTargetSoc, chargedEnergy, chargeTime, toInt(Math.round(chargeTime*60)), driveDistance);
               stopNumber=stopNumber+1;
               currentEnergy=nextTargetEnergy;
               remainingDistance=remainingAfterDrive;
@@ -285,6 +401,17 @@ function calculateAvailableRange(availableEnergy, consumptionPer100Km){
 function clamp(minValue, maxValue, value){
   const e=Compare(minValue, value)===1?minValue:value;
   return Compare(maxValue, e)===-1?maxValue:e;
+}
+function chooseChargerStopDistance(maxLegDistance, chargerSpacingKm, remainingDistance){
+  const a=20;
+  const spacing=Compare(a, chargerSpacingKm)===1?a:chargerSpacingKm;
+  const latestUsefulDistance=Compare(maxLegDistance, remainingDistance)===-1?maxLegDistance:remainingDistance;
+  const reachableChargerIndex=Math.floor(latestUsefulDistance/spacing);
+  if(reachableChargerIndex<1)return latestUsefulDistance;
+  else {
+    const chargerDistance=reachableChargerIndex*spacing;
+    return chargerDistance<1?latestUsefulDistance:chargerDistance;
+  }
 }
 function calculateSocFromEnergy(batteryCapacity, energy){
   return batteryCapacity<=0?0:energy/batteryCapacity*100;
@@ -317,7 +444,7 @@ function chooseDynamicTargetSoc(userTargetSoc, totalDistance, remainingAfterDriv
 function chargingPowerFactor(soc_1){
   return soc_1<20?0.85:soc_1<60?1:soc_1<80?0.65:0.3;
 }
-function New(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, NeedsCharging, ChargingNeededKWh, ChargingTimeHours, RemainingEnergyKWh, RemainingSocPercent, ChargingStops, ChargingStopDetails){
+function New_1(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, NeedsCharging, ChargingNeededKWh, ChargingTimeHours, RemainingEnergyKWh, RemainingSocPercent, ChargingStops, ChargingStopDetails){
   return{
     AvailableEnergyKWh:AvailableEnergyKWh, 
     AvailableRangeKm:AvailableRangeKm, 
@@ -330,17 +457,6 @@ function New(AvailableEnergyKWh, AvailableRangeKm, EnergyNeededKWh, TripCost, Ne
     RemainingSocPercent:RemainingSocPercent, 
     ChargingStops:ChargingStops, 
     ChargingStopDetails:ChargingStopDetails
-  };
-}
-function New_1(BatteryCapacity, ConsumptionPer100Km, DistanceKm, ElectricityPrice, StateOfChargePercent, ChargingPowerKw, TargetSocPercent){
-  return{
-    BatteryCapacity:BatteryCapacity, 
-    ConsumptionPer100Km:ConsumptionPer100Km, 
-    DistanceKm:DistanceKm, 
-    ElectricityPrice:ElectricityPrice, 
-    StateOfChargePercent:StateOfChargePercent, 
-    ChargingPowerKw:ChargingPowerKw, 
-    TargetSocPercent:TargetSocPercent
   };
 }
 class FSharpList {
@@ -520,6 +636,70 @@ function sumBy(f, s){
   }
   return res;
 }
+function collect(f, s){
+  return concat(map(f, s));
+}
+function pairwise(s){
+  return map((x) =>[get(x, 0), get(x, 1)], windowed(2, s));
+}
+function concat(ss){
+  return{GetEnumerator:() => {
+    const outerE=Get(ss);
+    function next(st){
+      while(true)
+        {
+          const m=st.s;
+          if(Equals(m, null)){
+            if(outerE.MoveNext()){
+              st.s=Get(outerE.Current);
+              st=st;
+            }
+            else {
+              outerE.Dispose();
+              return false;
+            }
+          }
+          else if(m.MoveNext()){
+            st.c=m.Current;
+            return true;
+          }
+          else {
+            st.Dispose();
+            st.s=null;
+            st=st;
+          }
+        }
+    }
+    return new T(null, null, next, (st) => {
+      const x=st.s;
+      if(!Equals(x, null))x.Dispose();
+      const x_1=outerE;
+      if(!Equals(x_1, null))x_1.Dispose();
+    });
+  }};
+}
+function map(f, s){
+  return{GetEnumerator:() => {
+    const en=Get(s);
+    return new T(null, null, (e) => en.MoveNext()&&(e.c=f(en.Current),true), () => {
+      en.Dispose();
+    });
+  }};
+}
+function windowed(windowSize, s){
+  windowSize<=0?FailWith("The input must be positive."):void 0;
+  return delay(() => enumUsing(Get(s), (e) => {
+    const q=[];
+    return append(enumWhile(() => q.length<windowSize&&e.MoveNext(), delay(() => {
+      q.push(e.Current);
+      return[];
+    })), delay(() => q.length===windowSize?append([q.slice(0)], delay(() => enumWhile(() => e.MoveNext(), delay(() => {
+      q.shift();
+      q.push(e.Current);
+      return[q.slice(0)];
+    })))):[]));
+  }));
+}
 function head(s){
   const e=Get(s);
   try {
@@ -585,17 +765,6 @@ function fold(f, x, s){
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
 }
-function collect(f, s){
-  return concat(map(f, s));
-}
-function map(f, s){
-  return{GetEnumerator:() => {
-    const en=Get(s);
-    return new T(null, null, (e) => en.MoveNext()&&(e.c=f(en.Current),true), () => {
-      en.Dispose();
-    });
-  }};
-}
 function iter(p, s){
   const e=Get(s);
   try {
@@ -606,42 +775,6 @@ function iter(p, s){
     const _1=e;
     if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
   }
-}
-function concat(ss){
-  return{GetEnumerator:() => {
-    const outerE=Get(ss);
-    function next(st){
-      while(true)
-        {
-          const m=st.s;
-          if(Equals(m, null)){
-            if(outerE.MoveNext()){
-              st.s=Get(outerE.Current);
-              st=st;
-            }
-            else {
-              outerE.Dispose();
-              return false;
-            }
-          }
-          else if(m.MoveNext()){
-            st.c=m.Current;
-            return true;
-          }
-          else {
-            st.Dispose();
-            st.s=null;
-            st=st;
-          }
-        }
-    }
-    return new T(null, null, next, (st) => {
-      const x=st.s;
-      if(!Equals(x, null))x.Dispose();
-      const x_1=outerE;
-      if(!Equals(x_1, null))x_1.Dispose();
-    });
-  }};
 }
 function init(n, f){
   return take(n, initInfinite(f));
@@ -747,6 +880,24 @@ function ofArray(arr){
   for(let i=length_1(arr)-1, _1=0;i>=_1;i--)r=FSharpList.Cons(get(arr, i), r);
   return r;
 }
+function max_1(list){
+  nonEmpty(list);
+  let m=list.$0;
+  let l=list.$1;
+  while(l.$==1)
+    {
+      const x=l.$0;
+      if(Compare(x, m)===1)m=x;
+      l=l.$1;
+    }
+  return m;
+}
+function collect_1(f, l){
+  return ofSeq(collect(f, l));
+}
+function pairwise_1(l){
+  return ofSeq(pairwise(l));
+}
 function length(l){
   let r=l;
   let i=0;
@@ -846,6 +997,9 @@ function filter(p, x){
     return res;
   }
 }
+function nonEmpty(l){
+  if(l.$==0)listEmpty();
+}
 function rev(l){
   let res=FSharpList.Empty;
   let r=l;
@@ -864,11 +1018,11 @@ function sort(l){
   sortInPlace(a);
   return ofArray(a);
 }
-function tail(l){
-  return l.$==1?l.$1:listEmpty();
-}
 function listEmpty(){
   return FailWith("The input list was empty.");
+}
+function tail(l){
+  return l.$==1?l.$1:listEmpty();
 }
 function head_1(l){
   return l.$==1?l.$0:listEmpty();
@@ -931,6 +1085,7 @@ let _c=Lazy((_i) => class $StartupCode_Client {
   static endNode;
   static startNode;
   static timelineSeparator;
+  static socChartPoints;
   static chargingStopDetails;
   static errorText;
   static chargingStopsText;
@@ -943,6 +1098,7 @@ let _c=Lazy((_i) => class $StartupCode_Client {
   static energyNeededText;
   static availableRangeText;
   static availableEnergyText;
+  static chargerInterval;
   static targetSoc;
   static chargingPower;
   static soc;
@@ -962,6 +1118,7 @@ let _c=Lazy((_i) => class $StartupCode_Client {
     this.soc=_c_2.Create_1("80");
     this.chargingPower=_c_2.Create_1("50");
     this.targetSoc=_c_2.Create_1("80");
+    this.chargerInterval=_c_2.Create_1("120");
     this.availableEnergyText=_c_2.Create_1("-");
     this.availableRangeText=_c_2.Create_1("-");
     this.energyNeededText=_c_2.Create_1("-");
@@ -974,6 +1131,7 @@ let _c=Lazy((_i) => class $StartupCode_Client {
     this.chargingStopsText=_c_2.Create_1("-");
     this.errorText=_c_2.Create_1("");
     this.chargingStopDetails=_c_2.Create_1(FSharpList.Empty);
+    this.socChartPoints=_c_2.Create_1(FSharpList.Empty);
     this.timelineSeparator=Doc.Element("div", [Attr.Create("class", "timeline-separator")], []);
     this.startNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-start")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u25ce")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("Start")])]);
     this.endNode=Doc.Element("div", [Attr.Create("class", "timeline-node timeline-end")], [Doc.Element("div", [Attr.Create("class", "timeline-icon")], [Doc.TextNode("\u2691")]), Doc.Element("div", [Attr.Create("class", "timeline-label")], [Doc.TextNode("End")])]);
@@ -1282,6 +1440,20 @@ function New_3(StopNumber, ArrivalSocPercent, TargetSocPercent, ChargedEnergyKWh
 function TryParse(s, r){
   return TryParse_2(s, -2147483648, 2147483647, r);
 }
+function get(arr, n){
+  checkBounds(arr, n);
+  return arr[n];
+}
+function length_1(arr){
+  return arr.dims===2?arr.length*arr.length:arr.length;
+}
+function checkBounds(arr, n){
+  if(n<0||n>=arr.length)FailWith("Index was outside the bounds of the array.");
+}
+function set(arr, n, x){
+  checkBounds(arr, n);
+  arr[n]=x;
+}
 function Updates(dyn){
   return MapTreeReduce((x) => x.NChanged, Const(), Map2Unit, dyn.DynNodes);
 }
@@ -1487,56 +1659,6 @@ class T extends Object_1 {
     this.e=0;
   }
 }
-function Equals(a, b){
-  if(a===b)return true;
-  else {
-    const m=typeof a;
-    if(m=="object"){
-      if(a===null||a===void 0||b===null||b===void 0||!Equals(typeof b, "object"))return false;
-      else if("Equals"in a)return a.Equals(b);
-      else if("Equals"in b)return false;
-      else if(a instanceof Array&&b instanceof Array)return arrayEquals(a, b);
-      else if(a instanceof Date&&b instanceof Date)return dateEquals(a, b);
-      else {
-        const a_1=a;
-        const b_1=b;
-        const eqR=[true];
-        let k;
-        for(var k_2 in a_1)if(((k_3) => {
-          eqR[0]=!a_1.hasOwnProperty(k_3)||b_1.hasOwnProperty(k_3)&&Equals(a_1[k_3], b_1[k_3]);
-          return!eqR[0];
-        })(k_2))break;
-        if(eqR[0]){
-          let k_1;
-          for(var k_3 in b_1)if(((k_4) => {
-            eqR[0]=!b_1.hasOwnProperty(k_4)||a_1.hasOwnProperty(k_4);
-            return!eqR[0];
-          })(k_3))break;
-        }
-        return eqR[0];
-      }
-    }
-    else return m=="function"&&("$Func"in a?a.$Func===b.$Func&&a.$Target===b.$Target:"$Invokes"in a&&"$Invokes"in b&&arrayEquals(a.$Invokes, b.$Invokes));
-  }
-}
-function arrayEquals(a, b){
-  let eq;
-  let i;
-  if(length_1(a)===length_1(b)){
-    eq=true;
-    i=0;
-    while(eq&&i<length_1(a))
-      {
-        !Equals(get(a, i), get(b, i))?eq=false:void 0;
-        i=i+1;
-      }
-    return eq;
-  }
-  else return false;
-}
-function dateEquals(a, b){
-  return a.getTime()===b.getTime();
-}
 function Compare(a, b){
   if(a===b)return 0;
   else {
@@ -1573,6 +1695,38 @@ function Compare(a, b){
     }
   }
 }
+function Equals(a, b){
+  if(a===b)return true;
+  else {
+    const m=typeof a;
+    if(m=="object"){
+      if(a===null||a===void 0||b===null||b===void 0||!Equals(typeof b, "object"))return false;
+      else if("Equals"in a)return a.Equals(b);
+      else if("Equals"in b)return false;
+      else if(a instanceof Array&&b instanceof Array)return arrayEquals(a, b);
+      else if(a instanceof Date&&b instanceof Date)return dateEquals(a, b);
+      else {
+        const a_1=a;
+        const b_1=b;
+        const eqR=[true];
+        let k;
+        for(var k_2 in a_1)if(((k_3) => {
+          eqR[0]=!a_1.hasOwnProperty(k_3)||b_1.hasOwnProperty(k_3)&&Equals(a_1[k_3], b_1[k_3]);
+          return!eqR[0];
+        })(k_2))break;
+        if(eqR[0]){
+          let k_1;
+          for(var k_3 in b_1)if(((k_4) => {
+            eqR[0]=!b_1.hasOwnProperty(k_4)||a_1.hasOwnProperty(k_4);
+            return!eqR[0];
+          })(k_3))break;
+        }
+        return eqR[0];
+      }
+    }
+    else return m=="function"&&("$Func"in a?a.$Func===b.$Func&&a.$Target===b.$Target:"$Invokes"in a&&"$Invokes"in b&&arrayEquals(a.$Invokes, b.$Invokes));
+  }
+}
 function compareArrays(a, b){
   let cmp;
   let i;
@@ -1591,6 +1745,24 @@ function compareArrays(a, b){
 }
 function compareDates(a, b){
   return Compare(a.getTime(), b.getTime());
+}
+function arrayEquals(a, b){
+  let eq;
+  let i;
+  if(length_1(a)===length_1(b)){
+    eq=true;
+    i=0;
+    while(eq&&i<length_1(a))
+      {
+        !Equals(get(a, i), get(b, i))?eq=false:void 0;
+        i=i+1;
+      }
+    return eq;
+  }
+  else return false;
+}
+function dateEquals(a, b){
+  return a.getTime()===b.getTime();
 }
 function Hash(o){
   const m=typeof o;
@@ -1789,20 +1961,6 @@ function WhenObsolete(snap, obs){
   if(m==null)Obsolete(obs);
   else m!=null&&m.$==2?(m.$0,EnqueueSafe(m.$1, obs)):m!=null&&m.$==3?(m.$0,EnqueueSafe(m.$1, obs)):m.$0;
 }
-function get(arr, n){
-  checkBounds(arr, n);
-  return arr[n];
-}
-function length_1(arr){
-  return arr.dims===2?arr.length*arr.length:arr.length;
-}
-function checkBounds(arr, n){
-  if(n<0||n>=arr.length)FailWith("Index was outside the bounds of the array.");
-}
-function set(arr, n, x){
-  checkBounds(arr, n);
-  arr[n]=x;
-}
 function ofSeqNonCopying(xs){
   if(xs instanceof Array)return xs;
   else if(xs instanceof FSharpList)return ofList(xs);
@@ -1969,6 +2127,45 @@ class Dictionary extends Object_1 {
       }
     }
   }
+}
+function tryLast(s){
+  const e=Get(s);
+  try {
+    let c;
+    if(e.MoveNext()){
+      c=e.Current;
+      while(e.MoveNext())
+        c=e.Current;
+      return Some(c);
+    }
+    else return null;
+  }
+  finally {
+    const _1=e;
+    if(typeof _1=="object"&&isIDisposable(_1))e.Dispose();
+  }
+}
+function insufficient(){
+  return FailWith("The input sequence has an insufficient number of elements.");
+}
+function mapiInPlace(f, arr){
+  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(i, arr[i]);
+  return arr;
+}
+function mapInPlace(f, arr){
+  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(arr[i]);
+}
+function arrContains(item, arr){
+  let c=true;
+  let i=0;
+  const l=length_1(arr);
+  while(c&&i<l)
+    if(Equals(arr[i], item))c=false;
+    else i=i+1;
+  return!c;
+}
+function nonNegative(){
+  return FailWith("The input must be non-negative.");
 }
 class View { }
 function Obsolete(sn){
@@ -2643,6 +2840,55 @@ function set_counter(_1){
 function counter(){
   return _c_6.counter;
 }
+function enumUsing(x, f){
+  return{GetEnumerator:() => {
+    let enum_1;
+    try {
+      enum_1=Get(f(x));
+    }
+    catch(e){
+      let c=x;
+      c.Dispose();
+      throw e;
+    }
+    return new T(null, null, (e_1) => enum_1.MoveNext()&&(e_1.c=enum_1.Current,true), () => {
+      let c_1;
+      enum_1.Dispose();
+      c_1=x;
+      c_1.Dispose();
+    });
+  }};
+}
+function enumWhile(f, s){
+  return{GetEnumerator:() => {
+    function next(en){
+      while(true)
+        {
+          const m=en.s;
+          if(Equals(m, null)){
+            if(f()){
+              en.s=Get(s);
+              en=en;
+            }
+            else return false;
+          }
+          else if(m.MoveNext()){
+            en.c=m.Current;
+            return true;
+          }
+          else {
+            m.Dispose();
+            en.s=null;
+            en=en;
+          }
+        }
+    }
+    return new T(null, null, next, (en) => {
+      const x=en.s;
+      if(!Equals(x, null))x.Dispose();
+    });
+  }};
+}
 class TemplateHole extends Object_1 { }
 function notPresent(){
   throw new KeyNotFoundException("New");
@@ -2808,28 +3054,6 @@ function string(source, start, finish){
     const s=start.$0;
     return f_1<0?"":source.slice(s, f_1+1);
   }
-}
-function insufficient(){
-  return FailWith("The input sequence has an insufficient number of elements.");
-}
-function mapiInPlace(f, arr){
-  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(i, arr[i]);
-  return arr;
-}
-function mapInPlace(f, arr){
-  for(let i=0, _1=arr.length-1;i<=_1;i++)arr[i]=f(arr[i]);
-}
-function arrContains(item, arr){
-  let c=true;
-  let i=0;
-  const l=length_1(arr);
-  while(c&&i<l)
-    if(Equals(arr[i], item))c=false;
-    else i=i+1;
-  return!c;
-}
-function nonNegative(){
-  return FailWith("The input must be non-negative.");
 }
 class KeyCollection extends Object_1 {
   d;
@@ -3467,9 +3691,9 @@ function TryParse_1(s){
   const d=Date.parse(s);
   return isNaN(d)?null:Some(d);
 }
-function TryParse_2(s, min, max_1, r){
+function TryParse_2(s, min, max_2, r){
   const x=+s;
-  const ok=x===x-x%1&&x>=min&&x<=max_1;
+  const ok=x===x-x%1&&x>=min&&x<=max_2;
   if(ok)r.set(x);
   return ok;
 }

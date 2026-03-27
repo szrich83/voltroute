@@ -9,76 +9,123 @@
 
 ![VoltRoute Preview](docs/main.png)
 
-Modern EV trip planning tool that estimates **range, charging stops, charging time, and trip cost** based on realistic electric vehicle behavior.
+Simulation-based EV trip planner that models **battery usage, charging strategy, and trip timeline** under realistic conditions.
 
 ---
 
 ## Features
 
-- Battery & consumption based range calculation
-- Charging stops estimation
-- Charging time simulation with SOC-based charging curve
-- Target charge strategy (e.g. 60% / 80%)
-- Vehicle presets (brand + model)
-- Trip cost calculation
-- Modern dark UI with highlighted key metrics
+### Core
 
----
+- Range estimation from battery + consumption
+- Charging stop calculation
+- Charging time simulation
+- Configurable target charge level (e.g. 60% / 80%)
+- Trip cost estimation
 
-## Key Concept
+### Advanced
 
-Unlike basic calculators, VoltRoute simulates **real-world EV charging behavior**:
+- **Smart charging logic**
+  - avoids unnecessary charging stops
+  - only stops when required
 
-- Charging slows down at higher SOC levels
-- Optimal strategy is not always 100% charging
-- Multiple short charging stops can be faster than one long charge
+- **Charger interval simulation**
+  - user-defined average distance between chargers
+  - approximates real-world infrastructure
+
+- **Trip timeline**
+  - structured sequence: start → drive → charge → arrival
+
+- **SOC graph**
+  - battery percentage tracked across the full trip
+
+- **Segment-based simulation**
+  - trip is divided into realistic driving + charging segments
 
 ---
 
 ## UI Overview
 
-### Main Input Panel
+- battery depletion over distance
+- charging decisions based on remaining range
+- non-linear charging behavior (SOC-dependent)
+- charger availability (distance-based approximation)
+- full trip timeline
+- SOC (State of Charge) evolution
 
-- Battery capacity
-- Consumption
-- Distance
+---
+
+## Simulation Model
+
+### Charging curve
+
+Charging speed is SOC-dependent:
+
+| SOC range | Effective power |
+| --------- | --------------- |
+| 0–20%     | 85%             |
+| 20–60%    | 100%            |
+| 60–80%    | 65%             |
+| 80%+      | 30%             |
+
+Charging is simulated incrementally to approximate real behavior.
+
+---
+
+### Smart charging decision
+
+For each segment, the system determines:
+
+- whether a charging stop is required
+- how much energy should be added
+- whether skipping a charger is optimal
+
+This prevents:
+
+- unnecessary micro-charging stops
+- inefficient 100% charging
+- unrealistic travel assumptions
+
+---
+
+### SOC tracking
+
+The system tracks battery level:
+
+- at trip start
+- after each driving segment
+- after each charging event
+
+This enables:
+
+- accurate arrival SOC estimation
+- graphical SOC visualization
+
+---
+
+## UI
+
+### Inputs
+
+- Battery capacity (kWh)
+- Consumption (kWh / 100 km)
+- Trip distance (km)
+- Charging power (kW)
+- Initial SOC (%)
+- Target SOC (%)
 - Electricity price
-- State of charge
-- Charging power
-- Target charge strategy
+- Average charger interval (km)
 
-### Results
+---
 
-- ⚡ Charging stops (highlighted)
-- ⏱ Charging time (highlighted)
-- Available range
-- Energy needed
+### Outputs
+
+- Charging stops
+- Total charging time
+- SOC graph
+- Trip timeline
 - Trip cost
-- Remaining SOC
-
----
-
-## Calculation Logic
-
-### Charging Curve (simplified model)
-
-| SOC range | Charging speed |
-| --------- | -------------- |
-| 0–20%     | 85% power      |
-| 20–60%    | 100% power     |
-| 60–80%    | 65% power      |
-| 80%+      | 30% power      |
-
-Charging is simulated in small SOC steps for realism.
-
----
-
-### Charging Strategy
-
-User-defined:
-
-- 60% → faster stops, more stops
-- 80% → slower stops, fewer stops
+- Arrival SOC
 
 ---
 
@@ -126,6 +173,10 @@ VoltRoute/
 ### Results Panel
 
 ![Results](docs/results.png)
+
+### SOC graph
+
+![SOC graph](docs/soc.png)
 
 ---
 
