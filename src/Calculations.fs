@@ -5,6 +5,7 @@ open WebSharper
 [<JavaScript>]
 module Calculations =
 
+    /// Input parameters required for EV trip simulation.
     type TripInput =
         {
             BatteryCapacity : float
@@ -17,6 +18,7 @@ module Calculations =
             AverageChargerIntervalKm : float
         }
 
+    /// Represents one charging stop during the trip.
     type ChargingStop =
         {
             StopNumber : int
@@ -28,6 +30,7 @@ module Calculations =
             DriveDistanceKm : float
         }
 
+    /// Final aggregated trip result shown in the UI.
     type TripResult =
         {
             AvailableEnergyKWh : float
@@ -43,20 +46,25 @@ module Calculations =
             ChargingStopDetails : ChargingStop list
         }
 
+    /// Restricts a value to a safe numeric interval.
     let clamp minValue maxValue value =
         value |> max minValue |> min maxValue
 
+    /// Converts battery capacity and SOC into currently available energy.
     let calculateAvailableEnergy batteryCapacity socPercent =
         batteryCapacity * (socPercent / 100.0)
 
+    /// Converts absolute battery energy back to SOC percentage.
     let calculateSocFromEnergy batteryCapacity energy =
         if batteryCapacity <= 0.0 then 0.0
         else (energy / batteryCapacity) * 100.0
 
+    /// Estimates theoretical range from available energy and consumption.
     let calculateAvailableRange availableEnergy consumptionPer100Km =
         if consumptionPer100Km <= 0.0 then 0.0
         else (availableEnergy / consumptionPer100Km) * 100.0
 
+    /// Calculates how much energy is needed for a given trip distance.
     let calculateEnergyNeeded distanceKm consumptionPer100Km =
         (distanceKm / 100.0) * consumptionPer100Km
 
@@ -73,12 +81,17 @@ module Calculations =
         if batteryCapacity <= 0.0 then 0.0
         else (remainingEnergy / batteryCapacity) * 100.0
 
+    /// Simplified SOC-dependent charging curve.
+    /// Charging is fastest in the mid-range and slows down at high SOC.
     let chargingPowerFactor soc =
         if soc < 20.0 then 0.85
         elif soc < 60.0 then 1.0
         elif soc < 80.0 then 0.65
         else 0.30
 
+    /// Estimates charging time between two SOC values using a simplified step-based simulation.
+    /// The charging power is reduced depending on the current SOC,
+    /// which produces more realistic results than a linear charge model.
     let estimateChargingTimeSegment batteryCapacity chargingPowerKw fromSoc toSoc =
         if batteryCapacity <= 0.0 || chargingPowerKw <= 0.0 || toSoc <= fromSoc then
             0.0
@@ -102,6 +115,10 @@ module Calculations =
 
             loop fromSoc 0.0
 
+    /// Chooses a dynamic target SOC for the next charge stop.
+    /// The idea is to avoid charging too high unnecessarily:
+    /// - early in a long trip, higher targets can reduce future risk
+    /// - later in the trip, lower targets are often faster and more efficient
     let chooseDynamicTargetSoc userTargetSoc totalDistance remainingAfterDrive =
         let distanceRatio =
             if totalDistance <= 0.0 then 0.0
@@ -116,6 +133,9 @@ module Calculations =
 
     /// Returns the latest reachable charger position assuming chargers are available
     /// every `chargerSpacingKm`. The charger spacing is availability, not a mandatory stop distance.
+    ///
+    /// This means the vehicle does not stop at every charger,
+    /// only at the furthest charger that is still safely reachable.
     let chooseChargerStopDistance maxLegDistance chargerSpacingKm remainingDistance =
         let spacing =
             chargerSpacingKm
@@ -132,18 +152,27 @@ module Calculations =
         else
             let chargerDistance = reachableChargerIndex * spacing
 
-            // If chargerDistance is too tiny due to some odd edge case, just use max safe range.
+            // Fallback protection for edge cases where the calculated charger distance
+            // would become unrealistically small.
             if chargerDistance < 1.0 then
                 latestUsefulDistance
             else
                 chargerDistance
 
+    /// Simulates the trip step-by-step and generates all required charging stops.
+    ///
+    /// Main ideas:
+    /// - a reserve SOC is kept for safety
+    /// - the car drives to the latest safely reachable charger
+    /// - the next charging target is chosen dynamically
+    /// - charging stops are skipped if no meaningful charging is needed
     let simulateChargingStops (input: TripInput) =
         let userTargetSoc = clamp 20.0 95.0 input.TargetSocPercent
 
         let startEnergy =
             calculateAvailableEnergy input.BatteryCapacity input.StateOfChargePercent
 
+        // Safety reserve to avoid planning trips that arrive at 0% SOC.
         let reserveSoc = 10.0
         let reserveEnergy =
             calculateAvailableEnergy input.BatteryCapacity reserveSoc
@@ -152,12 +181,15 @@ module Calculations =
             if remainingDistance <= 0.0 then
                 List.rev acc
             else
+                // Only the energy above the reserve is considered usable for the next leg.
                 let usableEnergyThisLeg =
                     max 0.0 (currentEnergy - reserveEnergy)
 
                 let maxLegDistance =
                     calculateAvailableRange usableEnergyThisLeg input.ConsumptionPer100Km
 
+                // If the remaining distance is reachable without another stop,
+                // the simulation ends.
                 if remainingDistance <= maxLegDistance then
                     List.rev acc
                 else
@@ -188,6 +220,8 @@ module Calculations =
                     let fullTargetEnergy =
                         calculateAvailableEnergy input.BatteryCapacity dynamicTargetSoc
 
+                    // The next charge should ideally be just enough to continue efficiently,
+                    // while still preserving the safety reserve.
                     let energyNeededToFinishWithReserve =
                         energyNeededForRemaining + reserveEnergy
 
@@ -208,6 +242,7 @@ module Calculations =
                             arrivalSoc
                             nextTargetSoc
 
+                    // Avoid creating meaningless stops caused by rounding or tiny differences.
                     if chargedEnergy < 0.01 || nextTargetSoc <= arrivalSoc + 0.1 then
                         List.rev acc
                     else
@@ -226,6 +261,9 @@ module Calculations =
 
         loop 1 startEnergy input.DistanceKm []
 
+    /// Calculates the overall trip result used by the UI.
+    /// If the trip cannot be completed on the initial battery,
+    /// the charging stop simulation is executed.
     let calculateTrip (input: TripInput) =
         let effectiveTargetSoc = clamp 20.0 95.0 input.TargetSocPercent
 

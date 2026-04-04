@@ -11,9 +11,11 @@ open VoltRoute.VehiclePresets
 [<JavaScript>]
 module Client =
 
+    /// UI state for preset selection.
     let selectedBrand = Var.Create ""
     let selectedModelId = Var.Create ""
 
+    /// Input fields bound to the form.
     let battery = Var.Create "75"
     let consumption = Var.Create "18"
     let distance = Var.Create "240"
@@ -23,6 +25,7 @@ module Client =
     let targetSoc = Var.Create "80"
     let chargerInterval = Var.Create "120"
 
+    /// Output fields displayed in the results panel.
     let availableEnergyText = Var.Create "-"
     let availableRangeText = Var.Create "-"
     let energyNeededText = Var.Create "-"
@@ -37,6 +40,8 @@ module Client =
     let chargingStopDetails = Var.Create<List<ChargingStop>>([])
     let socChartPoints = Var.Create<List<float * float>>([])
 
+    /// Applies the selected vehicle preset to the main input fields.
+    /// This allows quick comparison between predefined EV models.
     let applyPreset presetId =
         match tryFindPresetById presetId with
         | Some preset ->
@@ -46,6 +51,16 @@ module Client =
         | None ->
             ()
 
+    /// Builds chart points for SOC visualization across the full trip.
+    ///
+    /// The chart contains:
+    /// - the starting SOC at distance 0
+    /// - arrival SOC at each charging stop
+    /// - post-charge SOC at the same stop distance
+    /// - final SOC at total trip distance
+    ///
+    /// Repeating the same x-coordinate for arrival and target SOC creates
+    /// the visible vertical jump that represents charging on the graph.
     let buildSocChartPoints (input: TripInput) (result: TripResult) =
         let startSoc = input.StateOfChargePercent
         let totalDistance = input.DistanceKm
@@ -92,6 +107,10 @@ module Client =
 
             points @ [ (totalDistance, finalSoc) ]
 
+    /// Reads the current form values, executes the trip calculation,
+    /// and updates every UI output field.
+    ///
+    /// If parsing fails, the UI is reset to a safe state and an error is shown.
     let calculate () =
         try
             errorText.Value <- ""
@@ -145,6 +164,8 @@ module Client =
             span [ attr.``class`` "result-value" ] [ textView valueView ]
         ]
 
+    /// Special result row for boolean charging status.
+    /// A colored badge is used instead of plain text for better visual emphasis.
     let statusRow labelText valueView =
         div [ attr.``class`` "result-row" ] [
             span [ attr.``class`` "result-label" ] [ text labelText ]
@@ -202,6 +223,7 @@ module Client =
             div [ attr.``class`` "timeline-label" ] [ text "End" ]
         ]
 
+    /// Renders one charging stop node in the trip timeline.
     let chargeNode (stop: ChargingStop) =
         div [ attr.``class`` "timeline-node timeline-charge" ] [
             div [ attr.``class`` "timeline-icon" ] [ text "↯" ]
@@ -215,6 +237,9 @@ module Client =
             ]
         ]
 
+    /// Builds a visual trip timeline from charging stop details.
+    /// The sequence is rendered as:
+    /// start -> charge 1 -> charge 2 -> ... -> end
     let chargingTimeline detailsView =
         div [ attr.``class`` "timeline-card" ] [
             h3 [ attr.``class`` "timeline-title" ] [ text "Trip timeline" ]
@@ -239,6 +264,12 @@ module Client =
             ]
         ]
 
+    /// Renders a simple custom SOC chart without using an external chart library.
+    ///
+    /// The chart uses absolute-positioned HTML elements:
+    /// - horizontal grid lines for SOC reference levels
+    /// - rotated divs as line segments
+    /// - point markers for important state changes
     let socChart pointsView =
         let chartWidth = 860.0
         let chartHeight = 320.0
@@ -355,6 +386,9 @@ module Client =
                 pointsView
         ]
 
+    /// Brand selector.
+    /// Changing the brand resets the currently selected model,
+    /// because model options depend on the chosen brand.
     let brandField () =
         div [ attr.``class`` "field" ] [
             label [ attr.``class`` "label" ] [ text "Brand" ]
@@ -374,6 +408,9 @@ module Client =
             ]
         ]
 
+    /// Model selector.
+    /// The available models are filtered dynamically by the selected brand.
+    /// Choosing a model automatically applies its preset and recalculates the trip.
     let modelField () =
         let modelOptionsDoc =
             selectedBrand.View
@@ -411,6 +448,7 @@ module Client =
 
     [<SPAEntryPoint>]
     let Main () =
+        // Run one initial calculation so the page shows valid default results immediately.
         calculate ()
 
         div [ attr.``class`` "page" ] [

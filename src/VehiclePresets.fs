@@ -5,6 +5,8 @@ open WebSharper
 [<JavaScript>]
 module VehiclePresets =
 
+    /// Represents a predefined EV configuration that can populate
+    /// the input form with realistic vehicle-specific values.
     type VehiclePreset =
         {
             Id : string
@@ -15,6 +17,9 @@ module VehiclePresets =
             ChargingPowerKw : float
         }
 
+    /// Predefined EV presets used for quick vehicle selection in the UI.
+    /// These values provide realistic defaults for battery size,
+    /// average consumption, and charging capability.
     let presets =
         [
             {
@@ -147,15 +152,18 @@ module VehiclePresets =
             }
         ]
 
+    /// Returns the distinct list of available brands for the first dropdown.
     let brands =
         presets
         |> List.map (fun p -> p.Brand)
         |> List.distinct
         |> List.sort
 
+    /// Returns all vehicle presets that belong to the selected brand.
     let modelsForBrand brand =
         presets
         |> List.filter (fun p -> p.Brand = brand)
 
+    /// Finds a preset by its unique identifier.
     let tryFindPresetById presetId =
         presets |> List.tryFind (fun p -> p.Id = presetId)
