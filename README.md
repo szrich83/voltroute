@@ -9,7 +9,22 @@
 
 ![VoltRoute Preview](docs/main.png)
 
-Simulation-based EV trip planner that models **battery usage, charging strategy, and trip timeline** under realistic conditions.
+---
+
+## Motivation
+
+Planning long-distance trips with electric vehicles is fundamentally different from traditional route planning.
+
+Unlike internal combustion vehicles, EV travel depends on multiple interacting factors:
+
+- limited and dynamic driving range
+- non-linear charging behavior
+- charger availability constraints
+- trade-offs between charging time and number of stops
+
+Most simple calculators ignore these aspects and assume ideal conditions, leading to unrealistic results.
+
+The goal of VoltRoute is to model EV travel as a **simulation problem**, where charging decisions, battery state, and trip progression are evaluated step-by-step to produce more realistic outcomes.
 
 ---
 
@@ -41,17 +56,6 @@ Simulation-based EV trip planner that models **battery usage, charging strategy,
 
 - **Segment-based simulation**
   - trip is divided into realistic driving + charging segments
-
----
-
-## UI Overview
-
-- battery depletion over distance
-- charging decisions based on remaining range
-- non-linear charging behavior (SOC-dependent)
-- charger availability (distance-based approximation)
-- full trip timeline
-- SOC (State of Charge) evolution
 
 ---
 
@@ -138,7 +142,35 @@ This enables:
 
 ---
 
-## Run locally
+## Installation
+
+### Requirements
+
+- .NET 10 SDK
+- Node.js
+- npm
+
+### Clone the repository
+
+```bash
+git clone https://github.com/szrich83/voltroute.git
+cd voltroute
+```
+
+### Install dependencies
+
+```bash
+dotnet restore
+npm install
+```
+
+### Build
+
+```bash
+dotnet build -c Release
+```
+
+### Run the project
 
 ```bash
 dotnet run
