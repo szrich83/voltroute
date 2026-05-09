@@ -214,6 +214,8 @@ VoltRoute/
 
 ## Live Demo
 
+> Note: The live demo may take a few seconds to start if the Render instance is inactive.
+
 https://voltroute.onrender.com
 
 ## Author
